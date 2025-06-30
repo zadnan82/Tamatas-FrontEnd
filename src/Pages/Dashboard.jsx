@@ -1,36 +1,33 @@
-import React, { useState, useEffect } from "react";
-import { Listing, User, Message, Review } from "@/entities/all";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../components/ui/Toast';
+import Button from '../components/ui/Button';
+import Badge from '../components/ui/Badge';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import api from '../utils/api';
 import { 
   Plus, 
   ShoppingBag, 
   MessageSquare, 
   Star,
-  TrendingUp,
-  Package,
-  Users,
-  Calendar,
-  Edit, // Added Edit icon
-  Trash2 // Added Trash2 icon
-} from "lucide-react";
-import { Link, useNavigate } from "react-router-dom"; // Added useNavigate hook
-import { createPageUrl } from "@/utils";
-import { format } from "date-fns";
+  Eye,
+  Edit,
+  Trash2,
+  Calendar
+} from 'lucide-react';
 
-export default function Dashboard() {
+const Dashboard = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [myListings, setMyListings] = useState([]);
-  const [recentMessages, setRecentMessages] = useState([]);
-  const [myReviews, setMyReviews] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
   const [stats, setStats] = useState({
     totalListings: 0,
     activeListings: 0,
-    completedTrades: 0,
-    averageRating: 0
+    messages: 0,
+    rating: 0
   });
-  const navigate = useNavigate(); // Initialize useNavigate hook
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadDashboardData();
@@ -38,242 +35,193 @@ export default function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
-      const user = await User.me();
-      setCurrentUser(user);
-
-      // Load user's listings
-      const listings = await Listing.filter({ created_by: user.email }, '-created_date', 10);
-      setMyListings(listings);
-
-      // Load recent messages
-      const messages = await Message.filter({ recipient_id: user.id }, '-created_date', 5);
-      setRecentMessages(messages);
-
-      // Load reviews for this user
-      const reviews = await Review.filter({ reviewed_user_id: user.id }, '-created_date', 5);
-      setMyReviews(reviews);
-
-      // Calculate stats
-      const activeListings = listings.filter(l => l.status === 'active').length;
-      const completedTrades = user.total_trades || 0;
-      const avgRating = reviews.length > 0 
-        ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length 
-        : 0;
-
+      // In a real app, you'd make API calls here
+      // For now, using mock data
+      const mockListings = [
+        {
+          id: 1,
+          title: 'Fresh Organic Tomatoes',
+          category: 'tomatoes_peppers',
+          listing_type: 'for_sale',
+          status: 'active',
+          price: 4.50,
+          created_date: new Date().toISOString()
+        },
+        {
+          id: 2,
+          title: 'Looking for Basil',
+          category: 'herbs',
+          listing_type: 'looking_for',
+          status: 'active',
+          created_date: new Date().toISOString()
+        }
+      ];
+      
+      setMyListings(mockListings);
       setStats({
-        totalListings: listings.length,
-        activeListings,
-        completedTrades,
-        averageRating: avgRating
+        totalListings: 5,
+        activeListings: 3,
+        messages: 2,
+        rating: 4.8
       });
     } catch (error) {
-      console.error("Error loading dashboard data:", error);
+      console.error('Error loading dashboard:', error);
+      toast.error('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleEdit = (listing) => {
-    navigate(createPageUrl("CreateListing"), { state: { listing } });
-  };
-  
   const handleDelete = async (listingId) => {
-    if (window.confirm("Are you sure you want to delete this listing?")) {
+    if (window.confirm('Are you sure you want to delete this listing?')) {
       try {
-        await Listing.delete(listingId);
-        loadDashboardData(); // Refresh data after deletion
+        await api.deleteListing(listingId);
+        setMyListings(prev => prev.filter(l => l.id !== listingId));
+        toast.success('Listing deleted successfully');
       } catch (error) {
-        console.error("Failed to delete listing", error);
-        alert("Could not delete the listing.");
+        toast.error('Failed to delete listing');
       }
     }
   };
 
+  if (loading) {
+    return (
+      <div className="p-6 bg-gray-50 min-h-screen">
+        <div className="max-w-7xl mx-auto">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-24 bg-gray-200 rounded"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 p-6">
+    <div className="p-6 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Welcome back!</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Welcome back, {user?.full_name || 'User'}!
+            </h1>
             <p className="text-gray-600 mt-1">Manage your listings and trades</p>
           </div>
-          <Link to={createPageUrl("CreateListing")}>
-            <Button className="bg-green-500 hover:bg-green-600 text-white rounded-xl shadow-lg">
-              <Plus className="w-5 h-5 mr-2" />
+          <Link to="/create-listing">
+            <Button className="flex items-center gap-2">
+              <Plus className="w-5 h-5" />
               Create New Listing
             </Button>
           </Link>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white/80 backdrop-blur-sm border-green-100 shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Active Listings</CardTitle>
-              <Package className="w-4 h-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900">{stats.activeListings}</div>
-              <p className="text-xs text-gray-500 mt-1">of {stats.totalListings} total</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur-sm border-green-100 shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Completed Trades</CardTitle>
-              <TrendingUp className="w-4 h-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900">{stats.completedTrades}</div>
-              <p className="text-xs text-green-600 mt-1">+2 this month</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur-sm border-green-100 shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Average Rating</CardTitle>
-              <Star className="w-4 h-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900">
-                {stats.averageRating.toFixed(1)}
-              </div>
-              <div className="flex items-center mt-1">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Star
-                    key={star}
-                    className={`w-3 h-3 ${
-                      star <= stats.averageRating 
-                        ? 'text-yellow-400 fill-current' 
-                        : 'text-gray-300'
-                    }`}
-                  />
-                ))}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Active Listings</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.activeListings}</p>
+                </div>
+                <ShoppingBag className="w-8 h-8 text-green-500" />
               </div>
             </CardContent>
           </Card>
-
-          <Card className="bg-white/80 backdrop-blur-sm border-green-100 shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">New Messages</CardTitle>
-              <MessageSquare className="w-4 h-4 text-purple-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900">
-                {recentMessages.filter(m => !m.read).length}
+          
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Listings</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.totalListings}</p>
+                </div>
+                <Eye className="w-8 h-8 text-blue-500" />
               </div>
-              <p className="text-xs text-gray-500 mt-1">unread messages</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Messages</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.messages}</p>
+                </div>
+                <MessageSquare className="w-8 h-8 text-purple-500" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Rating</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.rating}</p>
+                </div>
+                <Star className="w-8 h-8 text-yellow-500" />
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* My Recent Listings */}
-          <Card className="bg-white/80 backdrop-blur-sm border-green-100 shadow-lg">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xl font-bold text-gray-900">My Recent Listings</CardTitle>
-                <Link to={createPageUrl("MyListings")}>
-                  <Button variant="outline" size="sm" className="rounded-xl">
-                    View All
-                  </Button>
-                </Link>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {myListings.slice(0, 5).map((listing) => (
-                <div key={listing.id} className="p-4 rounded-xl bg-green-50/50 dark:bg-gray-800 border border-green-100 dark:border-gray-700">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-900 dark:text-gray-100">{listing.title}</h4>
+        {/* Recent Listings */}
+        <Card>
+          <CardHeader>
+            <CardTitle>My Recent Listings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {myListings.length > 0 ? (
+              <div className="space-y-4">
+                {myListings.map(listing => (
+                  <div key={listing.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h4 className="font-medium text-gray-900">{listing.title}</h4>
                       <div className="flex items-center gap-2 mt-1">
-                        <Badge variant={listing.listing_type === 'for_sale' ? 'default' : 'secondary'} className="text-xs">
+                        <Badge variant={listing.listing_type === 'for_sale' ? 'default' : 'secondary'}>
                           {listing.listing_type === 'for_sale' ? 'For Sale' : 'Looking For'}
                         </Badge>
-                        <Badge variant="outline" className={`text-xs ${
-                          listing.status === 'active' ? 'text-green-600 border-green-200 dark:text-green-400 dark:border-green-800' : 'text-gray-500'
-                        }`}>
-                          {listing.status}
-                        </Badge>
+                        <Badge variant="outline">{listing.status}</Badge>
+                        {listing.price && (
+                          <span className="text-sm text-green-600">${listing.price}</span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(listing)}>
-                            <Edit className="w-4 h-4 text-blue-500" />
+                      <Link to={`/create-listing`} state={{ listing }}>
+                        <Button variant="ghost" size="icon">
+                          <Edit className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(listing.id)}>
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                        </Button>
+                      </Link>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => handleDelete(listing.id)}
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </Button>
                     </div>
                   </div>
-                </div>
-              ))}
-              {myListings.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                  <p>No listings yet</p>
-                  <p className="text-sm">Create your first listing to get started!</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Recent Activity */}
-          <Card className="bg-white/80 backdrop-blur-sm border-green-100 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-xl font-bold text-gray-900">Recent Activity</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {recentMessages.slice(0, 5).map((message) => (
-                <div key={message.id} className="flex items-start gap-3 p-4 rounded-xl bg-blue-50/50 border border-blue-100">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <MessageSquare className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-900">New message received</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {format(new Date(message.created_date), 'MMM d, h:mm a')}
-                    </p>
-                  </div>
-                  {!message.read && (
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  )}
-                </div>
-              ))}
-              
-              {myReviews.slice(0, 2).map((review) => (
-                <div key={review.id} className="flex items-start gap-3 p-4 rounded-xl bg-yellow-50/50 border border-yellow-100">
-                  <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-                    <Star className="w-4 h-4 text-yellow-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-900">New review received</p>
-                    <div className="flex items-center gap-1 mt-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className={`w-3 h-3 ${
-                            star <= review.rating 
-                              ? 'text-yellow-400 fill-current' 
-                              : 'text-gray-300'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {recentMessages.length === 0 && myReviews.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <Calendar className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                  <p>No recent activity</p>
-                  <p className="text-sm">Your activity will appear here</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <ShoppingBag className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                <p>No listings yet</p>
+                <p className="text-sm">Create your first listing to get started!</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
-}
+};
+
+export default Dashboard;
