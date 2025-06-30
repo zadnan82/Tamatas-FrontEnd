@@ -1,0 +1,127 @@
+{
+  "name": "Listing",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Listing title"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "apples_pears",
+        "citrus_fruits",
+        "berries",
+        "stone_fruits",
+        "tropical_fruits",
+        "leafy_greens",
+        "root_vegetables",
+        "tomatoes_peppers",
+        "beans_peas",
+        "squash_pumpkins",
+        "herbs",
+        "other"
+      ]
+    },
+    "subcategory": {
+      "type": "string",
+      "description": "Specific product name"
+    },
+    "listing_type": {
+      "type": "string",
+      "enum": [
+        "for_sale",
+        "looking_for"
+      ],
+      "description": "Type of listing"
+    },
+    "price": {
+      "type": "number",
+      "description": "Price per unit"
+    },
+    "price_unit": {
+      "type": "string",
+      "enum": [
+        "per_lb",
+        "per_kg",
+        "per_piece",
+        "per_dozen",
+        "per_bag"
+      ],
+      "default": "per_lb"
+    },
+    "quantity_available": {
+      "type": "string",
+      "description": "Available quantity description"
+    },
+    "trade_preference": {
+      "type": "string",
+      "enum": [
+        "sale_only",
+        "trade_only",
+        "both"
+      ],
+      "default": "both"
+    },
+    "images": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of image URLs",
+      "minItems": 1,
+      "maxItems": 3
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "pending",
+        "completed",
+        "expired"
+      ],
+      "default": "active"
+    },
+    "harvest_date": {
+      "type": "string",
+      "format": "date",
+      "description": "When the produce was/will be harvested"
+    },
+    "organic": {
+      "type": "boolean",
+      "default": false
+    },
+    "location": {
+      "type": "object",
+      "properties": {
+        "city": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "latitude": {
+          "type": "number"
+        },
+        "longitude": {
+          "type": "number"
+        }
+      }
+    },
+    "view_count": {
+      "type": "number",
+      "default": 0,
+      "description": "How many times the listing has been viewed"
+    }
+  },
+  "required": [
+    "title",
+    "category",
+    "listing_type",
+    "images"
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "name": "Message",
+  "type": "object",
+  "properties": {
+    "sender_id": {
+      "type": "string",
+      "description": "ID of message sender"
+    },
+    "recipient_id": {
+      "type": "string",
+      "description": "ID of message recipient"
+    },
+    "listing_id": {
+      "type": "string",
+      "description": "Related listing ID"
+    },
+    "content": {
+      "type": "string",
+      "description": "Message content"
+    },
+    "read": {
+      "type": "boolean",
+      "default": false
+    },
+    "message_type": {
+      "type": "string",
+      "enum": [
+        "inquiry",
+        "offer",
+        "general"
+      ],
+      "default": "general"
+    }
+  },
+  "required": [
+    "sender_id",
+    "recipient_id",
+    "content"
+  ]
+}

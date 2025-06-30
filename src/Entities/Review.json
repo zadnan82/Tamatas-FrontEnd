@@ -1,0 +1,55 @@
+{
+  "name": "Review",
+  "type": "object",
+  "properties": {
+    "reviewer_id": {
+      "type": "string",
+      "description": "ID of user leaving review"
+    },
+    "reviewed_user_id": {
+      "type": "string",
+      "description": "ID of user being reviewed"
+    },
+    "listing_id": {
+      "type": "string",
+      "description": "Related listing ID"
+    },
+    "rating": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "comment": {
+      "type": "string",
+      "description": "Review comment"
+    },
+    "trade_type": {
+      "type": "string",
+      "enum": [
+        "sale",
+        "trade",
+        "purchase"
+      ]
+    },
+    "product_quality": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "communication": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "delivery": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 5
+    }
+  },
+  "required": [
+    "reviewer_id",
+    "reviewed_user_id",
+    "rating"
+  ]
+}

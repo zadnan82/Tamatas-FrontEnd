@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+body {
+  background: linear-gradient(135deg, #0f172a, #1e293b, #334155);
+  color: #f8fafc;
+  min-height: 100vh;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #06b6d4, #3b82f6, #8b5cf6, #ec4899);
+  background-size: 300% 300%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradientShift 4s ease-in-out infinite;
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.glass-effect {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.vibrant-glow {
+  filter: drop-shadow(0 0 20px rgba(6, 182, 212, 0.4));
+}
+
+.floating-animation {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+}
+
+.navigation-fixed {
+  position: fixed;
+  top: 50%;
+  right: 2rem;
+  transform: translateY(-50%);
+  z-index: 9999;
+}
+
+/* Fix for project descriptions being cut off */
+.line-clamp-2 {
+  display: block !important;
+  overflow: visible !important;
+  -webkit-line-clamp: none !important;
+  -webkit-box-orient: unset !important;
+}
