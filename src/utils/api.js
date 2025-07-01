@@ -1,6 +1,8 @@
+
 class ApiService {
   constructor() {
-    this.baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+    // Use import.meta.env instead of process.env for Vite
+    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001';
     this.token = localStorage.getItem('token');
   }
 
@@ -29,7 +31,7 @@ class ApiService {
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || 'Request failed');
+        throw new Error(data.detail || data.error || 'Request failed');
       }
       
       return data;
@@ -39,14 +41,29 @@ class ApiService {
     }
   }
 
-  // Auth methods
+  // Auth methods - FIXED LOGIN METHOD
   async login(email, password) {
-    const data = await this.request('/auth/login', {
+    // FastAPI OAuth2PasswordRequestForm expects form data, not JSON
+    const formData = new FormData();
+    formData.append('username', email); // OAuth2 uses 'username' field but we pass email
+    formData.append('password', password);
+    
+    const response = await fetch(`${this.baseUrl}/auth/login`, {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: formData, // Send as form data, not JSON
     });
-    this.setToken(data.token);
-    return data;
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.detail || 'Login failed');
+    }
+    
+    this.setToken(data.access_token);
+    
+    // Get user info after login
+    const user = await this.getCurrentUser();
+    return { token: data.access_token, user };
   }
 
   async register(email, password, full_name) {
@@ -54,7 +71,7 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify({ email, password, full_name }),
     });
-    this.setToken(data.token);
+    this.setToken(data.access_token);
     return data;
   }
 
@@ -64,7 +81,7 @@ class ApiService {
 
   // User methods
   async getCurrentUser() {
-    return this.request('/users/me');
+    return this.request('/auth/me');
   }
 
   async updateProfile(updates) {
@@ -182,9 +199,9 @@ class ApiService {
   // Upload method
   async uploadFile(file) {
     const formData = new FormData();
-    formData.append('image', file);
+    formData.append('file', file);
     
-    const response = await fetch(`${this.baseUrl}/upload`, {
+    const response = await fetch(`${this.baseUrl}/upload/image`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.token}`,
