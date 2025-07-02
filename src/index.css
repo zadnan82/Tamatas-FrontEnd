@@ -1,56 +1,307 @@
 @import "tailwindcss";
 
-body {
-  background: linear-gradient(135deg, #0f172a, #1e293b, #334155);
-  color: #f8fafc;
-  min-height: 100vh;
+/* Claymorphism Global Styles */
+:root {
+  /* Claymorphism Color Palette */
+  --clay-primary: #E8E8E8;
+  --clay-secondary: #F5F5F5;
+  --clay-accent: #C8D5C8;
+  --clay-green: #A8C8A8;
+  --clay-blue: #B8D4E8;
+  --clay-purple: #D8C8E8;
+  --clay-pink: #E8C8D8;
+  --clay-yellow: #E8E8C8;
+  --clay-orange: #E8D8C8;
+  
+  /* Shadow definitions */
+  --clay-shadow-soft: 9px 9px 18px #d1d1d1, -9px -9px 18px #ffffff;
+  --clay-shadow-pressed: inset 9px 9px 18px #d1d1d1, inset -9px -9px 18px #ffffff;
+  --clay-shadow-hover: 12px 12px 24px #c8c8c8, -12px -12px 24px #ffffff;
+  
+  /* Gradients */
+  --clay-gradient-soft: linear-gradient(145deg, #f0f0f0, #e6e6e6);
+  --clay-gradient-green: linear-gradient(145deg, #b8d4b8, #98c498);
+  --clay-gradient-blue: linear-gradient(145deg, #c8e4f8, #a8d4e8);
+  --clay-gradient-purple: linear-gradient(145deg, #e8d8f8, #c8b8e8);
 }
 
-.gradient-text {
-  background: linear-gradient(135deg, #06b6d4, #3b82f6, #8b5cf6, #ec4899);
-  background-size: 300% 300%;
-  background-clip: text;
+/* Global body styling */
+body {
+  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+  min-height: 100vh;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #4a4a4a;
+  overflow-x: hidden;
+}
+
+/* Claymorphism base classes */
+.clay-card {
+  background: var(--clay-gradient-soft);
+  border-radius: 12px;
+  box-shadow: var(--clay-shadow-soft);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.clay-card:hover {
+  box-shadow: var(--clay-shadow-hover);
+  transform: translateY(-1px);
+}
+
+.clay-card-pressed {
+  background: var(--clay-gradient-soft);
+  border-radius: 12px;
+  box-shadow: var(--clay-shadow-pressed);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.clay-button {
+  background: var(--clay-gradient-soft);
+  border-radius: 8px;
+  box-shadow: var(--clay-shadow-soft);
+  border: none;
+  padding: 6px 12px;
+  font-weight: 600;
+  color: #4a4a4a;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  font-size: 14px;
+}
+
+.clay-button:hover {
+  box-shadow: var(--clay-shadow-hover);
+  transform: translateY(-1px);
+}
+
+.clay-button:active {
+  box-shadow: var(--clay-shadow-pressed);
+  transform: translateY(0);
+}
+
+.clay-button-primary {
+  background: var(--clay-gradient-green);
+  color: #2d5a2d;
+}
+
+.clay-button-secondary {
+  background: var(--clay-gradient-blue);
+  color: #2d4a5a;
+}
+
+.clay-input {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #4a4a4a;
+  box-shadow: inset 2px 2px 4px rgba(200, 200, 200, 0.3), 
+              inset -2px -2px 4px rgba(255, 255, 255, 0.8);
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.clay-input:focus {
+  outline: none;
+  border-color: var(--clay-green);
+  box-shadow: inset 2px 2px 4px rgba(168, 200, 168, 0.3), 
+              inset -2px -2px 4px rgba(255, 255, 255, 0.8),
+              0 0 0 2px rgba(168, 200, 168, 0.2);
+}
+
+.clay-badge {
+  background: var(--clay-gradient-soft);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  box-shadow: 2px 2px 4px rgba(200, 200, 200, 0.4), 
+              -2px -2px 4px rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.clay-badge-green {
+  background: var(--clay-gradient-green);
+  color: #2d5a2d;
+}
+
+.clay-badge-blue {
+  background: var(--clay-gradient-blue);
+  color: #2d4a5a;
+}
+
+.clay-badge-purple {
+  background: var(--clay-gradient-purple);
+  color: #5a2d5a;
+}
+
+/* Soft container backgrounds */
+.clay-container {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* Floating elements */
+.clay-floating {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1),
+              0 0 0 1px rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+/* Text styles */
+.clay-text-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #4a4a4a, #6a6a6a);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: gradientShift 4s ease-in-out infinite;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-@keyframes gradientShift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
+.clay-text-subtitle {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6a6a6a;
+  text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
 }
 
-.glass-effect {
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+.clay-text-soft {
+  color: #8a8a8a;
+  font-weight: 400;
+  text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+  font-size: 0.75rem;
 }
 
-.vibrant-glow {
-  filter: drop-shadow(0 0 20px rgba(6, 182, 212, 0.4));
+/* Navigation specific */
+.clay-nav {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
 }
 
-.floating-animation {
-  animation: float 6s ease-in-out infinite;
+.clay-nav-item {
+  background: transparent;
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin: 2px 0;
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+  font-size: 13px;
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-20px); }
+.clay-nav-item:hover {
+  background: rgba(168, 200, 168, 0.2);
+  box-shadow: 2px 2px 6px rgba(168, 200, 168, 0.2),
+              -2px -2px 6px rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(168, 200, 168, 0.3);
 }
 
-.navigation-fixed {
-  position: fixed;
-  top: 50%;
-  right: 2rem;
-  transform: translateY(-50%);
-  z-index: 9999;
+.clay-nav-item.active {
+  background: var(--clay-gradient-green);
+  box-shadow: inset 2px 2px 4px rgba(148, 180, 148, 0.4),
+              inset -2px -2px 4px rgba(200, 220, 200, 0.8);
+  color: #2d5a2d;
+  border: 1px solid rgba(168, 200, 168, 0.4);
 }
 
-/* Fix for project descriptions being cut off */
-.line-clamp-2 {
-  display: block !important;
-  overflow: visible !important;
-  -webkit-line-clamp: none !important;
-  -webkit-box-orient: unset !important;
+/* Responsive utilities */
+@media (max-width: 768px) {
+  .clay-card {
+    border-radius: 10px;
+    margin: 4px;
+  }
+  
+  .clay-button {
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+  }
+  
+  .clay-input {
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  
+  .clay-text-title {
+    font-size: 1.25rem;
+  }
+  
+  .clay-text-subtitle {
+    font-size: 0.75rem;
+  }
+  
+  .clay-text-soft {
+    font-size: 0.625rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .clay-card {
+    border-radius: 8px;
+    margin: 2px;
+  }
+  
+  .clay-button {
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+  }
+  
+  .clay-input {
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  
+  .clay-text-title {
+    font-size: 1.125rem;
+  }
+  
+  .clay-text-subtitle {
+    font-size: 0.6875rem;
+  }
+}
+
+/* Utility classes for spacing */
+.clay-p-2 { padding: 0.5rem; }
+.clay-p-3 { padding: 0.75rem; }
+.clay-p-4 { padding: 1rem; }
+.clay-m-2 { margin: 0.5rem; }
+.clay-m-3 { margin: 0.75rem; }
+.clay-m-4 { margin: 1rem; }
+
+/* Grid layouts */
+.clay-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.clay-grid-2 { grid-template-columns: repeat(2, 1fr); }
+.clay-grid-3 { grid-template-columns: repeat(3, 1fr); }
+.clay-grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+@media (max-width: 768px) {
+  .clay-grid {
+    gap: 0.5rem;
+  }
+  
+  .clay-grid-2, .clay-grid-3, .clay-grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 768px) {
+  .clay-grid-3, .clay-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }

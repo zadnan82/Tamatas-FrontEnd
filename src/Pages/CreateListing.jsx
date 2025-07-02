@@ -38,6 +38,13 @@ const CreateListing = () => {
         ...listingToEdit,
         price: listingToEdit.price || '',
         harvest_date: listingToEdit.harvest_date ? listingToEdit.harvest_date.split('T')[0] : '',
+        // Ensure location object exists with default values
+        location: {
+          city: listingToEdit.location?.city || '',
+          state: listingToEdit.location?.state || ''
+        },
+        // Ensure images array exists
+        images: listingToEdit.images || []
       });
     }
   }, [listingToEdit]);
