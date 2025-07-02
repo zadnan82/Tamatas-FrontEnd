@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import Button from '../ui/button';
 import { 
   Home, 
   ShoppingBag, 
@@ -20,78 +19,126 @@ const Navigation = () => {
   const location = useLocation();
   
   const menuItems = [
-    { name: 'Dashboard', icon: Home, path: '/dashboard' },
-    { name: 'Feeds', icon: Flame, path: '/feeds' },
-    { name: 'Marketplace', icon: ShoppingBag, path: '/marketplace' },
-    { name: 'Favorites', icon: Heart, path: '/favorites' },
-    { name: 'Messages', icon: MessageSquare, path: '/messages' },
-    { name: 'Forum', icon: MessageCircleQuestion, path: '/forum' },
-    { name: 'Profile', icon: UserIcon, path: '/profile' },
+    { 
+      name: 'Dashboard', 
+      icon: Home, 
+      path: '/dashboard',
+      color: 'from-vibrant-orange to-vibrant-red'
+    },
+    { 
+      name: 'Feeds', 
+      icon: Flame, 
+      path: '/feeds',
+      color: 'from-vibrant-red to-vibrant-pink'
+    },
+    { 
+      name: 'Marketplace', 
+      icon: ShoppingBag, 
+      path: '/marketplace',
+      color: 'from-vibrant-blue to-vibrant-cyan'
+    },
+    { 
+      name: 'Favorites', 
+      icon: Heart, 
+      path: '/favorites',
+      color: 'from-vibrant-pink to-vibrant-red'
+    },
+    { 
+      name: 'Messages', 
+      icon: MessageSquare, 
+      path: '/messages',
+      color: 'from-vibrant-cyan to-vibrant-blue'
+    },
+    { 
+      name: 'Forum', 
+      icon: MessageCircleQuestion, 
+      path: '/forum',
+      color: 'from-vibrant-purple to-vibrant-blue'
+    },
+    { 
+      name: 'Profile', 
+      icon: UserIcon, 
+      path: '/profile',
+      color: 'from-vibrant-green to-vibrant-cyan'
+    },
   ];
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 h-screen flex flex-col">
+    <div className="w-48 clay-nav h-screen flex flex-col">
       {/* Header */}
-      <div className="p-6 border-b">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center">
-            <Leaf className="w-6 h-6 text-white" />
+      <div className="p-3 border-b border-white/20">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-gradient-to-br from-vibrant-orange via-vibrant-red to-vibrant-cyan rounded-xl flex items-center justify-center clay-animate-float">
+            <Leaf className="w-4 h-4 text-white drop-shadow-lg" />
           </div>
           <div>
-            <h2 className="font-bold text-xl text-gray-900">Fresh Trade</h2>
-            <p className="text-xs text-green-600">Local Food Exchange</p>
+            <h2 className="font-bold text-base clay-text-title">Fresh Trade</h2>
+            <p className="text-xs text-vibrant-green font-medium">Local Exchange</p>
           </div>
         </div>
       </div>
       
       {/* Navigation Menu */}
-      <nav className="flex-1 p-4">
+      <nav className="flex-1 p-2">
         <div className="space-y-1">
-          {menuItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                location.pathname === item.path
-                  ? 'bg-green-100 text-green-700'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <item.icon className="w-5 h-5" />
-              {item.name}
-            </Link>
-          ))}
+          {menuItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`clay-nav-item w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-all relative overflow-hidden ${
+                  isActive ? 'active' : ''
+                }`}
+                style={isActive ? {
+                  background: `linear-gradient(135deg, ${item.color.split(' ')[1]} 0%, ${item.color.split(' ')[3]} 100%)`,
+                  color: 'white',
+                  boxShadow: 'inset 2px 2px 4px rgba(0, 0, 0, 0.1)'
+                } : {}}
+              >
+                <div className={`w-5 h-5 rounded-lg flex items-center justify-center ${
+                  isActive ? 'bg-white/20' : `bg-gradient-to-br ${item.color}`
+                }`}>
+                  <item.icon className={`w-3 h-3 ${isActive ? 'text-white' : 'text-white'}`} />
+                </div>
+                <span className="font-medium text-xs">{item.name}</span>
+              </Link>
+            );
+          })}
         </div>
         
-        <div className="mt-8">
+        <div className="mt-4">
           <Link to="/create-listing">
-            <Button className="w-full flex items-center gap-2">
-              <Plus className="w-4 h-4" />
+            <button className="clay-button-primary w-full flex items-center gap-2 px-2 py-2 text-xs font-semibold">
+              <Plus className="w-3 h-3" />
               Create Listing
-            </Button>
+            </button>
           </Link>
         </div>
       </nav>
 
       {/* User Info & Logout */}
-      <div className="p-4 border-t">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-            <UserIcon className="w-4 h-4 text-gray-500" />
+      <div className="p-2 border-t border-white/20">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-6 h-6 bg-gradient-to-br from-vibrant-green to-vibrant-cyan rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-xs">
+              {user?.full_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
+            </span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm truncate">{user?.full_name || 'User'}</p>
-            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+            <p className="font-medium text-xs truncate">
+              {user?.full_name || user?.email?.split('@')[0] || 'User'}
+            </p>
+            <p className="text-xs clay-text-soft truncate">{user?.email}</p>
           </div>
         </div>
-        <Button 
-          variant="ghost" 
+        <button 
           onClick={logout} 
-          className="w-full justify-start text-red-600 hover:text-red-700"
+          className="clay-button w-full justify-start text-vibrant-red hover:bg-red-50 text-xs flex items-center gap-2"
         >
-          <LogOut className="w-4 h-4 mr-3" />
+          <LogOut className="w-3 h-3" />
           Sign Out
-        </Button>
+        </button>
       </div>
     </div>
   );

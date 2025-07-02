@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import api from '../utils/api';
+import { apiClient } from '../config/api';
 
 const AuthContext = createContext();
 
@@ -21,13 +21,18 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuth = async () => {
     try {
-      if (api.token) {
-        const userData = await api.getCurrentUser();
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        apiClient.setToken(token);
+        const userData = await apiClient.getCurrentUser();
         setUser(userData);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
-      api.clearToken();
+      // Clear invalid token
+      localStorage.removeItem('auth_token');
+      apiClient.setToken(null);
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -35,31 +40,58 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const data = await api.login(email, password);
-      setUser(data.user);
-      return data;
+      const response = await apiClient.login(email, password);
+      
+      // Get user data after successful login
+      const userData = await apiClient.getCurrentUser();
+      setUser(userData);
+      
+      return response;
     } catch (error) {
+      console.error('Login failed:', error);
       throw error;
     }
   };
 
   const register = async (email, password, full_name) => {
     try {
-      const data = await api.register(email, password, full_name);
-      setUser(data.user);
-      return data;
+      const response = await apiClient.register({
+        email,
+        password,
+        full_name,
+        bio: '',
+        phone: '',
+        address: '',
+        profile_image: ''
+      });
+      
+      // Get user data after successful registration
+      const userData = await apiClient.getCurrentUser();
+      setUser(userData);
+      
+      return response;
     } catch (error) {
+      console.error('Registration failed:', error);
       throw error;
     }
   };
 
   const logout = () => {
-    api.logout();
+    apiClient.logout();
     setUser(null);
+    // Redirect to home page
+    window.location.href = '/';
   };
 
-  const updateUser = (updates) => {
-    setUser(prev => ({ ...prev, ...updates }));
+  const updateUser = async (updates) => {
+    try {
+      const updatedUser = await apiClient.updateProfile(updates);
+      setUser(prevUser => ({ ...prevUser, ...updatedUser }));
+      return updatedUser;
+    } catch (error) {
+      console.error('Profile update failed:', error);
+      throw error;
+    }
   };
 
   const value = {
@@ -68,7 +100,12 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateUser,
-    loading
+    loading,
+    // Additional helper methods
+    isAuthenticated: !!user,
+    userId: user?.id,
+    userEmail: user?.email,
+    userName: user?.full_name || user?.email?.split('@')[0] || 'User'
   };
 
   return (
