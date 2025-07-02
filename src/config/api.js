@@ -1,75 +1,6 @@
-// API Configuration - Centralized endpoint management
-const API_CONFIG = {
-  // Base URLs
-  BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:8001',
-  
-  // Auth endpoints
-  AUTH: {
-    LOGIN: '/auth/login',
-    REGISTER: '/auth/register',
-    ME: '/auth/me',
-    REFRESH: '/auth/refresh'
-  },
-  
-  // User endpoints
-  USERS: {
-    ME: '/users/me',
-    PROFILE: (id) => `/users/${id}`,
-    UPDATE_ME: '/users/me',
-    REVIEWS: (id) => `/users/${id}/reviews`
-  },
-  
-  // Listing endpoints
-  LISTINGS: {
-    BASE: '/listings',
-    MY_LISTINGS: '/listings/my',
-    FEEDS: '/listings/feeds',
-    BY_ID: (id) => `/listings/${id}`,
-    CREATE: '/listings',
-    UPDATE: (id) => `/listings/${id}`,
-    DELETE: (id) => `/listings/${id}`
-  },
-  
-  // Message endpoints
-  MESSAGES: {
-    BASE: '/messages',
-    CONVERSATION: (userId) => `/messages/conversations/${userId}`,
-    MARK_READ: (messageId) => `/messages/${messageId}/read`
-  },
-  
-  // Review endpoints
-  REVIEWS: {
-    BASE: '/reviews',
-    USER_REVIEWS: (userId) => `/reviews/user/${userId}`
-  },
-  
-  // Favorite endpoints
-  FAVORITES: {
-    BASE: '/favorites',
-    DELETE: (id) => `/favorites/${id}`
-  },
-  
-  // Forum endpoints
-  FORUM: {
-    TOPICS: '/forum/topics',
-    TOPIC_BY_ID: (id) => `/forum/topics/${id}`,
-    POSTS: '/forum/posts',
-    TOPIC_POSTS: (topicId) => `/forum/topics/${topicId}/posts`
-  },
-  
-  // Upload endpoints
-  UPLOAD: {
-    IMAGE: '/upload/image',
-    IMAGES: '/upload/images'
-  },
-  
-  // Contact endpoints
-  CONTACT: {
-    BASE: '/contact'
-  }
-};
+// src/config/api.js - Updated with better error handling
+import API_CONFIG from './api';
 
-// API Client class for making requests
 class ApiClient {
   constructor() {
     this.baseURL = API_CONFIG.BASE_URL;
@@ -105,22 +36,78 @@ class ApiClient {
     };
 
     try {
+      console.log(`Making ${config.method || 'GET'} request to:`, url);
+      if (config.body) {
+        console.log('Request body:', config.body);
+      }
+      
       const response = await fetch(url, config);
       
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Request failed' }));
-        throw new Error(errorData.detail || errorData.message || 'Request failed');
+        let errorData;
+        const contentType = response.headers.get('content-type');
+        
+        try {
+          if (contentType && contentType.includes('application/json')) {
+            errorData = await response.json();
+          } else {
+            const textData = await response.text();
+            errorData = { detail: textData || `HTTP ${response.status} ${response.statusText}` };
+          }
+          console.log('Error response data:', errorData);
+        } catch (jsonError) {
+          console.log('Could not parse error response:', jsonError);
+          errorData = { detail: `Request failed with status ${response.status} ${response.statusText}` };
+        }
+        
+        // Create a proper Error object with the error data
+        const error = new Error('API Request Failed');
+        error.status = response.status;
+        error.data = errorData;
+        
+        // Handle different error formats
+        if (errorData.detail) {
+          if (Array.isArray(errorData.detail)) {
+            // FastAPI validation errors
+            error.message = errorData.detail.map(err => {
+              const location = err.loc ? err.loc.join('.') : 'unknown field';
+              const message = err.msg || 'validation error';
+              return `${location}: ${message}`;
+            }).join(', ');
+          } else {
+            error.message = errorData.detail;
+          }
+        } else if (errorData.message) {
+          error.message = errorData.message;
+        } else if (errorData.error) {
+          error.message = errorData.error;
+        } else {
+          error.message = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        
+        throw error;
       }
 
-      // Handle empty responses
+      // Handle successful responses
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
-        return await response.json();
+        const responseData = await response.json();
+        console.log('Success response data:', responseData);
+        return responseData;
       }
       
       return response;
     } catch (error) {
-      console.error('API Request Error:', error);
+      console.error('API Request Error Details:', {
+        url,
+        method: config.method || 'GET',
+        error: error.message,
+        status: error.status,
+        data: error.data
+      });
       throw error;
     }
   }
@@ -183,7 +170,7 @@ class ApiClient {
     return this.request(API_CONFIG.USERS.REVIEWS(userId));
   }
 
-  // Listing methods
+  // Listing methods with better validation
   async getListings(filters = {}) {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
@@ -210,9 +197,48 @@ class ApiClient {
   }
 
   async createListing(listingData) {
+    // Validate required fields before sending
+    const requiredFields = ['title', 'category', 'listing_type', 'images'];
+    const missingFields = requiredFields.filter(field => {
+      if (field === 'images') {
+        return !listingData[field] || listingData[field].length === 0;
+      }
+      return !listingData[field] || listingData[field].trim() === '';
+    });
+
+    if (missingFields.length > 0) {
+      throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+    }
+
+    // Clean up the data
+    const cleanData = {
+      title: listingData.title.trim(),
+      description: listingData.description || '',
+      category: listingData.category,
+      subcategory: listingData.subcategory || null,
+      listing_type: listingData.listing_type,
+      price: listingData.price || null,
+      price_unit: listingData.price_unit || 'per_lb',
+      quantity_available: listingData.quantity_available || '',
+      trade_preference: listingData.trade_preference || 'both',
+      images: listingData.images,
+      status: 'active',
+      harvest_date: listingData.harvest_date || null,
+      organic: Boolean(listingData.organic),
+      location: {
+        city: listingData.location?.city || '',
+        state: listingData.location?.state || '',
+        latitude: listingData.location?.latitude || null,
+        longitude: listingData.location?.longitude || null
+      },
+      view_count: 0
+    };
+
+    console.log('Sending cleaned listing data:', cleanData);
+
     return this.request(API_CONFIG.LISTINGS.CREATE, {
       method: 'POST',
-      body: JSON.stringify(listingData),
+      body: JSON.stringify(cleanData),
     });
   }
 
