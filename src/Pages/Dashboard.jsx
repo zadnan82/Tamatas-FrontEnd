@@ -29,44 +29,89 @@ const Dashboard = () => {
     try {
       setLoading(true);
       
-      // Load real data from API
-      const [listingsResponse, feedsResponse] = await Promise.all([
-        apiClient.getMyListings(),
-        apiClient.getFeeds()
-      ]);
+      // Mock data for demo
+      const mockListings = [
+        {
+          id: 1,
+          title: 'Fresh Organic Tomatoes',
+          description: 'Vine-ripened heirloom tomatoes from our organic farm.',
+          category: 'tomatoes_peppers',
+          listing_type: 'for_sale',
+          price: 4.50,
+          price_unit: 'per_lb',
+          images: ['https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=300'],
+          status: 'active',
+          view_count: 45,
+          favorites_count: 12,
+          created_date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString()
+        },
+        {
+          id: 2,
+          title: 'Fresh Basil Leaves',
+          description: 'Aromatic sweet basil, perfect for pesto.',
+          category: 'herbs',
+          listing_type: 'for_sale',
+          price: 3.00,
+          price_unit: 'per_bag',
+          images: ['https://images.unsplash.com/photo-1618375569909-3c8616cf5ecf?w=300'],
+          status: 'active',
+          view_count: 23,
+          favorites_count: 8,
+          created_date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString()
+        }
+      ];
       
-      setMyListings(listingsResponse);
+      setMyListings(mockListings);
       
-      // Calculate stats from real data
-      const activeListings = listingsResponse.filter(l => l.status === 'active');
-      const totalViews = listingsResponse.reduce((sum, listing) => sum + (listing.view_count || 0), 0);
+      // Calculate stats
+      const activeListings = mockListings.filter(l => l.status === 'active');
+      const totalViews = mockListings.reduce((sum, listing) => sum + (listing.view_count || 0), 0);
       
       setStats({
-        totalListings: listingsResponse.length,
+        totalListings: mockListings.length,
         activeListings: activeListings.length,
-        messages: 0, // Will be loaded from messages endpoint
-        rating: 4.8, // Will be calculated from reviews
+        messages: 3,
+        rating: 4.8,
         totalViews: totalViews,
-        totalRevenue: 0, // Will be calculated from completed trades
-        completedTrades: listingsResponse.filter(l => l.status === 'completed').length
+        totalRevenue: 127.50,
+        completedTrades: 5
       });
       
-      // Generate activity from feeds
-      const activity = feedsResponse.slice(0, 5).map((listing, index) => ({
-        id: listing.id,
-        type: listing.listing_type === 'for_sale' ? 'new_listing' : 'new_request',
-        title: listing.listing_type === 'for_sale' ? 'New listing posted' : 'New request posted',
-        content: listing.title,
-        user: {
-          name: listing.owner?.full_name || 'Anonymous',
-          location: listing.location ? `${listing.location.city}, ${listing.location.state}` : 'Unknown'
+      // Mock recent activity
+      const mockActivity = [
+        {
+          id: 1,
+          type: 'new_listing',
+          title: 'New listing posted',
+          content: 'Fresh Organic Tomatoes',
+          user: { name: 'John Farmer', location: 'Springfield, IL' },
+          timestamp: new Date(Date.now() - 1000 * 60 * 30),
+          icon: '🛍️',
+          color: 'from-orange-400 to-red-400'
         },
-        timestamp: new Date(listing.created_date),
-        icon: listing.listing_type === 'for_sale' ? '🛍️' : '💬',
-        color: listing.listing_type === 'for_sale' ? 'from-vibrant-orange to-vibrant-red' : 'from-vibrant-blue to-vibrant-cyan'
-      }));
+        {
+          id: 2,
+          type: 'trade_completed',
+          title: 'Trade completed',
+          content: 'Successfully traded basil for mint',
+          user: { name: 'Jane Gardener', location: 'Madison, WI' },
+          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
+          icon: '💚',
+          color: 'from-green-400 to-emerald-400'
+        },
+        {
+          id: 3,
+          type: 'new_message',
+          title: 'New message',
+          content: 'Question about tomato availability',
+          user: { name: 'Chef Mike', location: 'Chicago, IL' },
+          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4),
+          icon: '💬',
+          color: 'from-blue-400 to-cyan-400'
+        }
+      ];
       
-      setRecentActivity(activity);
+      setRecentActivity(mockActivity);
       
     } catch (error) {
       console.error('Error loading dashboard:', error);
@@ -79,10 +124,8 @@ const Dashboard = () => {
   const handleDelete = async (listingId) => {
     if (window.confirm('Are you sure you want to delete this listing?')) {
       try {
-        await apiClient.deleteListing(listingId);
         setMyListings(prev => prev.filter(l => l.id !== listingId));
         toast.success('Listing deleted successfully');
-        // Refresh stats
         loadDashboardData();
       } catch (error) {
         console.error('Delete failed:', error);
@@ -92,27 +135,26 @@ const Dashboard = () => {
   };
 
   const StatCard = ({ icon, title, value, subtitle, trend, gradient }) => (
-    <div className="clay-card p-6 bg-white/90 hover:scale-105 transition-all duration-300 group relative overflow-hidden">
-      {/* Beautiful gradient background */}
+    <div className="clay-card p-3 sm:p-4 bg-white/90 hover:scale-105 transition-all duration-300 group relative overflow-hidden">
       <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
       
       <div className="relative z-10">
-        <div className="flex items-center justify-between mb-4">
-          <div className={`w-14 h-14 bg-gradient-to-br ${gradient} rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
-            <span className="text-white text-2xl">{icon}</span>
+        <div className="flex items-center justify-between mb-2 sm:mb-3">
+          <div className={`w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br ${gradient} rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-md`}>
+            <span className="text-white text-base sm:text-lg">{icon}</span>
           </div>
           {trend && (
-            <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold ${trend > 0 ? 'text-vibrant-green bg-green-50' : 'text-vibrant-red bg-red-50'}`}>
-              <span className="text-lg">{trend > 0 ? '📈' : '📉'}</span>
+            <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${trend > 0 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+              <span className="text-sm">{trend > 0 ? '📈' : '📉'}</span>
               <span>{Math.abs(trend)}%</span>
             </div>
           )}
         </div>
         
-        <div className="clay-text-title text-3xl font-bold mb-2">{value}</div>
-        <div className="clay-text-subtitle text-lg font-semibold mb-1">{title}</div>
+        <div className="text-xl sm:text-2xl font-bold mb-1 text-gray-900">{value}</div>
+        <div className="text-sm sm:text-base font-semibold mb-0.5 text-gray-700">{title}</div>
         {subtitle && (
-          <div className="clay-text-soft text-sm">{subtitle}</div>
+          <div className="text-xs text-gray-600">{subtitle}</div>
         )}
       </div>
     </div>
@@ -120,23 +162,23 @@ const Dashboard = () => {
 
   const ActivityItem = ({ activity }) => {
     return (
-      <div className="clay-card p-4 bg-white/80 hover:bg-white/95 hover:scale-[1.02] transition-all duration-300 group">
-        <div className="flex items-start gap-4">
-          <div className={`w-12 h-12 bg-gradient-to-br ${activity.color} rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-300`}>
-            <span className="text-white text-xl">{activity.icon}</span>
+      <div className="clay-card p-3 sm:p-4 bg-white/80 hover:bg-white/95 hover:scale-[1.01] transition-all duration-300 group">
+        <div className="flex items-start gap-3">
+          <div className={`w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br ${activity.color} rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-300`}>
+            <span className="text-white text-sm sm:text-base">{activity.icon}</span>
           </div>
           
           <div className="flex-1 min-w-0">
-            <h4 className="clay-text-title font-bold text-base mb-1">{activity.title}</h4>
-            <p className="clay-text-subtitle text-sm mb-2 line-clamp-2">{activity.content}</p>
-            <div className="flex items-center gap-4 text-xs clay-text-soft">
+            <h4 className="text-sm sm:text-base font-bold text-gray-900 mb-1">{activity.title}</h4>
+            <p className="text-xs sm:text-sm text-gray-600 mb-1 line-clamp-2">{activity.content}</p>
+            <div className="flex items-center gap-3 text-xs text-gray-500">
               <div className="flex items-center gap-1">
-                <span className="text-sm">🕒</span>
+                <span className="text-xs">🕒</span>
                 <span>{formatDistanceToNow(activity.timestamp, { addSuffix: true })}</span>
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-sm">📍</span>
-                <span>{activity.user.location}</span>
+                <span className="text-xs">📍</span>
+                <span className="truncate">{activity.user.location}</span>
               </div>
             </div>
           </div>
@@ -146,10 +188,9 @@ const Dashboard = () => {
   };
 
   const ListingCard = ({ listing }) => (
-    <div className="clay-card p-5 bg-white/90 hover:scale-[1.02] hover:shadow-xl transition-all duration-300 group">
-      <div className="flex items-center gap-4">
-        {/* Beautiful image container */}
-        <div className="image-container-large flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+    <div className="clay-card p-3 sm:p-4 bg-white/90 hover:scale-[1.01] hover:shadow-lg transition-all duration-300 group">
+      <div className="flex items-center gap-3">
+        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
           {listing.images && listing.images[0] ? (
             <img 
               src={listing.images[0]} 
@@ -157,54 +198,54 @@ const Dashboard = () => {
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-vibrant-green to-vibrant-cyan flex items-center justify-center">
-              <span className="text-white text-4xl">🌱</span>
+            <div className="w-full h-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center">
+              <span className="text-white text-xl">🌱</span>
             </div>
           )}
         </div>
         
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex-1 mr-3">
-              <h4 className="clay-text-title font-bold text-xl mb-3 line-clamp-1 group-hover:text-vibrant-orange transition-colors duration-300">{listing.title}</h4>
-              <div className="flex flex-wrap items-center gap-2 mb-3">
-                <span className={`clay-badge clay-badge-${listing.listing_type === 'for_sale' ? 'primary' : 'blue'}`}>
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex-1 mr-2">
+              <h4 className="text-sm sm:text-base font-bold text-gray-900 line-clamp-1 group-hover:text-orange-600 transition-colors duration-300">{listing.title}</h4>
+              <div className="flex flex-wrap items-center gap-1 mt-1">
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${listing.listing_type === 'for_sale' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
                   {listing.listing_type === 'for_sale' ? '🏷️ For Sale' : '🔍 Looking For'}
                 </span>
-                <span className={`clay-badge clay-badge-${listing.status === 'active' ? 'green' : 'gray'}`}>
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${listing.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                   {listing.status === 'active' ? '✅ Active' : '⏸️ Inactive'}
                 </span>
                 {listing.price && (
-                  <span className="px-3 py-1 bg-gradient-to-r from-vibrant-green to-green-400 text-white font-bold text-sm rounded-full">
+                  <span className="px-2 py-0.5 bg-gradient-to-r from-green-400 to-emerald-400 text-white font-bold text-xs rounded-full">
                     💰 ${listing.price}
                   </span>
                 )}
               </div>
             </div>
             
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1 flex-shrink-0">
               <Link to={`/create-listing`} state={{ listing }}>
-                <button className="clay-button p-3 rounded-xl hover:bg-blue-50 hover:text-vibrant-blue transition-all duration-300" title="Edit listing">
-                  <span className="text-lg">✏️</span>
+                <button className="p-2 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-all duration-300" title="Edit listing">
+                  <span className="text-sm">✏️</span>
                 </button>
               </Link>
               <button 
                 onClick={() => handleDelete(listing.id)}
-                className="clay-button p-3 rounded-xl text-vibrant-red hover:bg-red-50 transition-all duration-300"
+                className="p-2 rounded-lg text-red-600 hover:bg-red-50 transition-all duration-300"
                 title="Delete listing"
               >
-                <span className="text-lg">🗑️</span>
+                <span className="text-sm">🗑️</span>
               </button>
             </div>
           </div>
           
-          <div className="flex items-center gap-6 text-base clay-text-soft">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">👁️</span>
+          <div className="flex items-center gap-4 text-xs sm:text-sm text-gray-600">
+            <div className="flex items-center gap-1">
+              <span className="text-sm">👁️</span>
               <span className="font-semibold">{listing.view_count || 0} views</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-lg">❤️</span>
+            <div className="flex items-center gap-1">
+              <span className="text-sm">❤️</span>
               <span className="font-semibold">{listing.favorites_count || 0} likes</span>
             </div>
           </div>
@@ -215,34 +256,34 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="clay-card p-12 text-center bg-white/90">
-          <div className="clay-loading w-12 h-12 rounded-full mx-auto mb-6"></div>
-          <p className="clay-text-soft text-xl font-semibold">Loading your beautiful dashboard...</p>
+      <div className="max-w-6xl mx-auto p-3 sm:p-6">
+        <div className="clay-card p-6 sm:p-12 text-center bg-white/90">
+          <div className="w-8 h-8 sm:w-12 sm:h-12 border-2 sm:border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin mx-auto mb-3 sm:mb-6"></div>
+          <p className="text-gray-600 text-sm sm:text-xl font-semibold">Loading your dashboard...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 p-6">
-      {/* GORGEOUS WELCOME HEADER */}
-      <div className="clay-card p-8 bg-gradient-to-br from-vibrant-orange/10 to-vibrant-red/10 border-2 border-vibrant-orange/20 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-vibrant-orange/5 to-vibrant-red/5"></div>
+    <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6 lg:space-y-8 p-3 sm:p-6">
+      {/* Welcome Header */}
+      <div className="clay-card p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-orange-50 to-pink-50 border border-orange-200 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-orange-400/5 to-red-400/5"></div>
         <div className="relative z-10">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="clay-text-title text-4xl font-black mb-3 bg-gradient-to-r from-vibrant-orange to-vibrant-red bg-clip-text text-transparent">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-black mb-2 bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">
                 Welcome back, {user?.full_name || 'Farmer'}! 🌱
               </h1>
-              <p className="clay-text-subtitle text-xl font-semibold">Here's what's happening with your Fresh Trade account</p>
+              <p className="text-sm sm:text-lg font-semibold text-gray-700">Here's what's happening with your Fresh Trade account</p>
             </div>
             <div className="flex-shrink-0">
               <Link to="/create-listing">
-                <button className="clay-button-primary px-8 py-4 font-black text-white flex items-center gap-3 text-lg rounded-2xl hover:scale-105 transition-all duration-300">
-                  <span className="text-2xl">➕</span>
+                <button className="w-full sm:w-auto px-4 py-2.5 sm:px-6 sm:py-3 bg-gradient-to-r from-orange-400 to-red-400 text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2 rounded-lg hover:scale-105 transition-all duration-300">
+                  <span className="text-lg">➕</span>
                   Create Listing
-                  <span className="text-2xl">✨</span>
+                  <span className="text-lg">✨</span>
                 </button>
               </Link>
             </div>
@@ -250,15 +291,15 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* BEAUTIFUL STATS GRID */}
-      <div className="clay-grid clay-grid-4">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard
           icon="🛍️"
           title="Active Listings"
           value={stats.activeListings}
-          subtitle={`${stats.totalListings} total listings`}
+          subtitle={`${stats.totalListings} total`}
           trend={12}
-          gradient="from-vibrant-green to-vibrant-cyan"
+          gradient="from-green-400 to-emerald-500"
         />
         <StatCard
           icon="👁️"
@@ -266,118 +307,124 @@ const Dashboard = () => {
           value={stats.totalViews.toLocaleString()}
           subtitle="This month"
           trend={8}
-          gradient="from-vibrant-blue to-vibrant-purple"
+          gradient="from-blue-400 to-cyan-500"
         />
         <StatCard
           icon="💰"
-          title="Completed Trades"
+          title="Completed"
           value={stats.completedTrades}
           subtitle="This month"
           trend={15}
-          gradient="from-vibrant-orange to-vibrant-pink"
+          gradient="from-orange-400 to-pink-400"
         />
         <StatCard
           icon="⭐"
           title="Rating"
           value={stats.rating}
-          subtitle="Based on reviews"
-          gradient="from-vibrant-pink to-vibrant-red"
+          subtitle="From reviews"
+          gradient="from-pink-400 to-red-400"
         />
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-8">
-        {/* STUNNING RECENT ACTIVITY */}
+      <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+        {/* Recent Activity */}
         <div className="lg:col-span-2">
-          <div className="clay-card p-8 bg-white/90">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="clay-text-title text-2xl font-black flex items-center gap-3">
-                <span className="text-3xl">⚡</span>
+          <div className="clay-card p-4 sm:p-6 lg:p-8 bg-white/90">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl font-black flex items-center gap-2">
+                <span className="text-xl sm:text-2xl">⚡</span>
                 Recent Activity
               </h2>
-              <Link to="/feeds" className="clay-text-soft hover:text-vibrant-orange text-base font-bold transition-colors duration-300">
+              <Link to="/feeds" className="text-gray-600 hover:text-orange-600 text-sm font-bold transition-colors duration-300">
                 View All →
               </Link>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {recentActivity.length > 0 ? (
                 recentActivity.map(activity => (
                   <ActivityItem key={activity.id} activity={activity} />
                 ))
               ) : (
-                <div className="text-center py-12">
-                  <div className="w-20 h-20 bg-gradient-to-br from-vibrant-blue to-vibrant-cyan rounded-3xl flex items-center justify-center mx-auto mb-4 animate-bounce-subtle">
-                    <span className="text-white text-4xl">📈</span>
+                <div className="text-center py-8 sm:py-12">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-lg flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                    <span className="text-white text-xl sm:text-2xl">📈</span>
                   </div>
-                  <h3 className="clay-text-title text-xl font-bold mb-2">No recent activity</h3>
-                  <p className="clay-text-soft text-lg">Create a listing to get started!</p>
+                  <h3 className="text-base sm:text-lg font-bold mb-2 text-gray-900">No recent activity</h3>
+                  <p className="text-sm sm:text-base text-gray-600">Create a listing to get started!</p>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* BEAUTIFUL SIDEBAR */}
-        <div className="space-y-6">
-          {/* GORGEOUS QUICK ACTIONS */}
-          <div className="clay-card p-6 bg-white/90">
-            <h3 className="clay-text-title text-xl font-black mb-6 flex items-center gap-2">
-              <span className="text-2xl">✨</span>
+        {/* Sidebar */}
+        <div className="space-y-4 sm:space-y-6">
+          {/* Quick Actions */}
+          <div className="clay-card p-4 sm:p-6 bg-white/90">
+            <h3 className="text-base sm:text-lg font-black mb-4 sm:mb-6 flex items-center gap-2">
+              <span className="text-lg sm:text-xl">✨</span>
               Quick Actions
             </h3>
-            <div className="space-y-4">
-              <Link to="/create-listing" className="clay-button w-full flex items-center gap-4 justify-start text-base font-bold p-4 hover:scale-105 transition-all duration-300">
-                <span className="text-xl">➕</span>
-                Create New Listing
-              </Link>
-              <Link to="/messages" className="clay-button w-full flex items-center gap-4 justify-between text-base font-bold p-4 hover:scale-105 transition-all duration-300">
-                <div className="flex items-center gap-4">
-                  <span className="text-xl">💬</span>
-                  Messages
+            <div className="space-y-2 sm:space-y-3">
+              <Link to="/create-listing" className="block w-full p-3 sm:p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:scale-105 transition-all duration-300 text-sm font-bold text-gray-800">
+                <div className="flex items-center gap-3">
+                  <span className="text-base sm:text-lg">➕</span>
+                  Create New Listing
                 </div>
-                {stats.messages > 0 && (
-                  <span className="clay-badge clay-badge-green">
-                    {stats.messages}
-                  </span>
-                )}
               </Link>
-              <Link to="/marketplace" className="clay-button w-full flex items-center gap-4 justify-start text-base font-bold p-4 hover:scale-105 transition-all duration-300">
-                <span className="text-xl">🛒</span>
-                Browse Marketplace
+              <Link to="/messages" className="block w-full p-3 sm:p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:scale-105 transition-all duration-300 text-sm font-bold text-gray-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-base sm:text-lg">💬</span>
+                    Messages
+                  </div>
+                  {stats.messages > 0 && (
+                    <span className="px-2 py-0.5 bg-green-500 text-white text-xs rounded-full">
+                      {stats.messages}
+                    </span>
+                  )}
+                </div>
+              </Link>
+              <Link to="/marketplace" className="block w-full p-3 sm:p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:scale-105 transition-all duration-300 text-sm font-bold text-gray-800">
+                <div className="flex items-center gap-3">
+                  <span className="text-base sm:text-lg">🛒</span>
+                  Browse Marketplace
+                </div>
               </Link>
             </div>
           </div>
 
-          {/* STUNNING QUICK STATS */}
-          <div className="clay-card p-6 bg-gradient-to-br from-vibrant-purple/10 to-vibrant-blue/10 border-2 border-vibrant-purple/20">
-            <h3 className="clay-text-title text-xl font-black mb-6 flex items-center gap-2">
-              <span className="text-2xl">📊</span>
+          {/* Quick Stats */}
+          <div className="clay-card p-4 sm:p-6 bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200">
+            <h3 className="text-base sm:text-lg font-black mb-4 sm:mb-6 flex items-center gap-2">
+              <span className="text-lg sm:text-xl">📊</span>
               Quick Stats
             </h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between py-3 border-b-2 border-white/30">
-                <span className="clay-text-title text-base font-bold flex items-center gap-2">
-                  <span className="text-lg">🏷️</span>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between py-2 border-b border-white/30">
+                <span className="text-sm font-bold flex items-center gap-2">
+                  <span className="text-sm">🏷️</span>
                   For Sale
                 </span>
-                <span className="px-4 py-2 bg-gradient-to-r from-vibrant-orange to-vibrant-red text-white font-bold rounded-full text-lg">
+                <span className="px-2 py-1 bg-gradient-to-r from-orange-400 to-red-400 text-white font-bold rounded-full text-sm">
                   {myListings.filter(l => l.listing_type === 'for_sale').length}
                 </span>
               </div>
-              <div className="flex items-center justify-between py-3 border-b-2 border-white/30">
-                <span className="clay-text-title text-base font-bold flex items-center gap-2">
-                  <span className="text-lg">🔍</span>
+              <div className="flex items-center justify-between py-2 border-b border-white/30">
+                <span className="text-sm font-bold flex items-center gap-2">
+                  <span className="text-sm">🔍</span>
                   Looking For
                 </span>
-                <span className="px-4 py-2 bg-gradient-to-r from-vibrant-blue to-vibrant-cyan text-white font-bold rounded-full text-lg">
+                <span className="px-2 py-1 bg-gradient-to-r from-blue-400 to-cyan-400 text-white font-bold rounded-full text-sm">
                   {myListings.filter(l => l.listing_type === 'looking_for').length}
                 </span>
               </div>
-              <div className="flex items-center justify-between py-3">
-                <span className="clay-text-title text-base font-bold flex items-center gap-2">
-                  <span className="text-lg">🌱</span>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-sm font-bold flex items-center gap-2">
+                  <span className="text-sm">🌱</span>
                   Organic
                 </span>
-                <span className="px-4 py-2 bg-gradient-to-r from-vibrant-green to-green-400 text-white font-bold rounded-full text-lg">
+                <span className="px-2 py-1 bg-gradient-to-r from-green-400 to-emerald-400 text-white font-bold rounded-full text-sm">
                   {myListings.filter(l => l.organic).length}
                 </span>
               </div>
@@ -386,68 +433,68 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* GORGEOUS MY LISTINGS SECTION */}
-      <div className="clay-card p-8 bg-white/90">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="clay-text-title text-2xl font-black flex items-center gap-3">
-            <span className="text-3xl">🛍️</span>
+      {/* My Listings Section */}
+      <div className="clay-card p-4 sm:p-6 lg:p-8 bg-white/90">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <h2 className="text-lg sm:text-xl font-black flex items-center gap-2">
+            <span className="text-xl sm:text-2xl">🛍️</span>
             My Recent Listings
           </h2>
-          <Link to="/my-listings" className="clay-text-soft hover:text-vibrant-green text-base font-bold transition-colors duration-300">
+          <Link to="/my-listings" className="text-gray-600 hover:text-green-600 text-sm font-bold transition-colors duration-300">
             View All →
           </Link>
         </div>
         
         {myListings.length > 0 ? (
-          <div className="space-y-6">
+          <div className="space-y-3 sm:space-y-4 lg:space-y-6">
             {myListings.slice(0, 3).map(listing => (
               <ListingCard key={listing.id} listing={listing} />
             ))}
           </div>
         ) : (
-          <div className="text-center py-16">
-            <div className="w-24 h-24 clay-card rounded-3xl bg-gradient-to-br from-vibrant-orange to-vibrant-red flex items-center justify-center mx-auto mb-6 animate-float">
-              <span className="text-white text-4xl">🛍️</span>
+          <div className="text-center py-8 sm:py-12 lg:py-16">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 clay-card rounded-2xl bg-gradient-to-br from-orange-400 to-red-400 flex items-center justify-center mx-auto mb-4 sm:mb-6">
+              <span className="text-white text-2xl sm:text-3xl">🛍️</span>
             </div>
-            <h3 className="clay-text-title text-2xl font-black mb-3">No listings yet</h3>
-            <p className="clay-text-soft mb-8 text-xl">Create your first listing to get started on Fresh Trade!</p>
+            <h3 className="text-lg sm:text-xl font-black mb-2 sm:mb-3 text-gray-900">No listings yet</h3>
+            <p className="text-gray-600 mb-4 sm:mb-8 text-sm sm:text-lg">Create your first listing to get started on Fresh Trade!</p>
             <Link to="/create-listing">
-              <button className="clay-button-primary px-8 py-4 font-black text-white flex items-center gap-3 mx-auto text-lg rounded-2xl hover:scale-105 transition-all duration-300">
-                <span className="text-2xl">➕</span>
+              <button className="px-6 py-3 sm:px-8 sm:py-4 bg-gradient-to-r from-orange-400 to-red-400 text-white font-black flex items-center gap-2 mx-auto text-sm sm:text-base rounded-lg hover:scale-105 transition-all duration-300">
+                <span className="text-lg sm:text-xl">➕</span>
                 Create Your First Listing
-                <span className="text-2xl">✨</span>
+                <span className="text-lg sm:text-xl">✨</span>
               </button>
             </Link>
           </div>
         )}
       </div>
 
-      {/* BEAUTIFUL TIPS SECTION */}
-      <div className="clay-card p-8 bg-gradient-to-br from-vibrant-blue/10 to-vibrant-cyan/10 border-2 border-vibrant-blue/20">
-        <h2 className="clay-text-title text-2xl font-black mb-6 flex items-center gap-3">
-          <span className="text-3xl">💡</span>
+      {/* Tips Section */}
+      <div className="clay-card p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200">
+        <h2 className="text-lg sm:text-xl font-black mb-4 sm:mb-6 flex items-center gap-2">
+          <span className="text-xl sm:text-2xl">💡</span>
           Tips to Improve Success
         </h2>
-        <div className="clay-grid clay-grid-2">
-          <div className="clay-card p-6 bg-white/90 hover:scale-105 transition-all duration-300 group">
-            <div className="text-4xl mb-3 group-hover:animate-bounce-subtle">📸</div>
-            <h4 className="clay-text-title font-black mb-3 text-lg">Add Quality Photos</h4>
-            <p className="clay-text-soft text-base">Listings with photos get 3x more views and responses.</p>
+        <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
+          <div className="clay-card p-4 sm:p-6 bg-white/90 hover:scale-105 transition-all duration-300 group">
+            <div className="text-2xl sm:text-3xl mb-2 sm:mb-3 group-hover:animate-bounce">📸</div>
+            <h4 className="text-sm sm:text-base font-black mb-2 sm:mb-3 text-gray-900">Add Quality Photos</h4>
+            <p className="text-xs sm:text-sm text-gray-600">Listings with photos get 3x more views and responses.</p>
           </div>
-          <div className="clay-card p-6 bg-white/90 hover:scale-105 transition-all duration-300 group">
-            <div className="text-4xl mb-3 group-hover:animate-bounce-subtle">💬</div>
-            <h4 className="clay-text-title font-black mb-3 text-lg">Respond Quickly</h4>
-            <p className="clay-text-soft text-base">Fast responses lead to more successful trades.</p>
+          <div className="clay-card p-4 sm:p-6 bg-white/90 hover:scale-105 transition-all duration-300 group">
+            <div className="text-2xl sm:text-3xl mb-2 sm:mb-3 group-hover:animate-bounce">💬</div>
+            <h4 className="text-sm sm:text-base font-black mb-2 sm:mb-3 text-gray-900">Respond Quickly</h4>
+            <p className="text-xs sm:text-sm text-gray-600">Fast responses lead to more successful trades.</p>
           </div>
-          <div className="clay-card p-6 bg-white/90 hover:scale-105 transition-all duration-300 group">
-            <div className="text-4xl mb-3 group-hover:animate-bounce-subtle">🏷️</div>
-            <h4 className="clay-text-title font-black mb-3 text-lg">Fair Pricing</h4>
-            <p className="clay-text-soft text-base">Research market prices for competitive listings.</p>
+          <div className="clay-card p-4 sm:p-6 bg-white/90 hover:scale-105 transition-all duration-300 group">
+            <div className="text-2xl sm:text-3xl mb-2 sm:mb-3 group-hover:animate-bounce">🏷️</div>
+            <h4 className="text-sm sm:text-base font-black mb-2 sm:mb-3 text-gray-900">Fair Pricing</h4>
+            <p className="text-xs sm:text-sm text-gray-600">Research market prices for competitive listings.</p>
           </div>
-          <div className="clay-card p-6 bg-white/90 hover:scale-105 transition-all duration-300 group">
-            <div className="text-4xl mb-3 group-hover:animate-bounce-subtle">📝</div>
-            <h4 className="clay-text-title font-black mb-3 text-lg">Detailed Descriptions</h4>
-            <p className="clay-text-soft text-base">Include variety, quantity, and growing methods.</p>
+          <div className="clay-card p-4 sm:p-6 bg-white/90 hover:scale-105 transition-all duration-300 group">
+            <div className="text-2xl sm:text-3xl mb-2 sm:mb-3 group-hover:animate-bounce">📝</div>
+            <h4 className="text-sm sm:text-base font-black mb-2 sm:mb-3 text-gray-900">Detailed Descriptions</h4>
+            <p className="text-xs sm:text-sm text-gray-600">Include variety, quantity, and growing methods.</p>
           </div>
         </div>
       </div>

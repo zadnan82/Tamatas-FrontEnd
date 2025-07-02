@@ -15,9 +15,9 @@ const Button = ({
   ...props 
 }) => {
   const baseClasses = `
-    inline-flex items-center justify-center gap-2 font-semibold rounded-xl
+    inline-flex items-center justify-center gap-1.5 font-medium rounded-lg
     transition-all duration-200 ease-in-out
-    focus:outline-none focus:ring-2 focus:ring-offset-2
+    focus:outline-none focus:ring-2 focus:ring-offset-1
     disabled:opacity-50 disabled:cursor-not-allowed
     relative overflow-hidden
     ${fullWidth ? 'w-full' : ''}
@@ -27,52 +27,51 @@ const Button = ({
     primary: `
       bg-gradient-to-r from-orange-400 via-red-400 to-pink-400
       hover:from-orange-500 hover:via-red-500 hover:to-pink-500
-      text-white shadow-lg hover:shadow-xl
-      focus:ring-orange-300
+      text-white shadow-md hover:shadow-lg
+      focus:ring-orange-200
       transform hover:scale-[1.02] active:scale-[0.98]
     `,
     secondary: `
       bg-gradient-to-r from-blue-400 to-cyan-400
       hover:from-blue-500 hover:to-cyan-500
-      text-white shadow-lg hover:shadow-xl
-      focus:ring-blue-300
+      text-white shadow-md hover:shadow-lg
+      focus:ring-blue-200
       transform hover:scale-[1.02] active:scale-[0.98]
     `,
     success: `
       bg-gradient-to-r from-green-400 to-emerald-400
       hover:from-green-500 hover:to-emerald-500
-      text-white shadow-lg hover:shadow-xl
-      focus:ring-green-300
+      text-white shadow-md hover:shadow-lg
+      focus:ring-green-200
       transform hover:scale-[1.02] active:scale-[0.98]
     `,
     outline: `
-      border-2 border-gradient-to-r from-orange-400 to-pink-400
-      bg-white hover:bg-gradient-to-r hover:from-orange-50 hover:to-pink-50
-      text-gray-700 hover:text-orange-600
-      shadow-md hover:shadow-lg
-      focus:ring-orange-300
+      border border-orange-300 bg-white hover:bg-orange-50
+      text-gray-700 hover:text-orange-600 hover:border-orange-400
+      shadow-sm hover:shadow-md
+      focus:ring-orange-200
     `,
     ghost: `
-      bg-transparent hover:bg-gradient-to-r hover:from-orange-50 hover:to-pink-50
+      bg-transparent hover:bg-orange-50
       text-gray-600 hover:text-orange-600
-      shadow-none hover:shadow-md
-      focus:ring-orange-300
+      shadow-none hover:shadow-sm
+      focus:ring-orange-200
     `,
     danger: `
       bg-gradient-to-r from-red-500 to-rose-500
       hover:from-red-600 hover:to-rose-600
-      text-white shadow-lg hover:shadow-xl
-      focus:ring-red-300
+      text-white shadow-md hover:shadow-lg
+      focus:ring-red-200
       transform hover:scale-[1.02] active:scale-[0.98]
     `
   };
   
   const sizes = {
-    xs: 'text-xs px-2 py-1 min-h-[24px]',
-    sm: 'text-sm px-3 py-1.5 min-h-[32px]',
-    md: 'text-sm px-4 py-2 min-h-[40px]',
-    lg: 'text-base px-6 py-3 min-h-[48px]',
-    xl: 'text-lg px-8 py-4 min-h-[56px]'
+    xs: 'text-xs px-2 py-1 min-h-[24px] gap-1',
+    sm: 'text-xs px-3 py-1.5 min-h-[28px] gap-1 sm:text-sm sm:px-4 sm:py-2 sm:min-h-[32px]',
+    md: 'text-sm px-3 py-2 min-h-[32px] gap-1.5 sm:px-4 sm:py-2.5 sm:min-h-[36px]',
+    lg: 'text-sm px-4 py-2.5 min-h-[36px] gap-2 sm:text-base sm:px-6 sm:py-3 sm:min-h-[44px]',
+    xl: 'text-base px-6 py-3 min-h-[44px] gap-2 sm:text-lg sm:px-8 sm:py-4 sm:min-h-[52px]'
   };
   
   const isLoading = loading || disabled;
@@ -87,16 +86,16 @@ const Button = ({
     >
       {/* Loading spinner */}
       {loading && (
-        <Loader2 className="w-4 h-4 animate-spin" />
+        <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
       )}
       
       {/* Icon */}
       {icon && !loading && (
-        React.cloneElement(icon, { className: "w-4 h-4" })
+        React.cloneElement(icon, { className: "w-3 h-3 sm:w-4 sm:h-4" })
       )}
       
       {/* Button text */}
-      <span className={loading ? 'opacity-70' : ''}>
+      <span className={`${loading ? 'opacity-70' : ''} truncate`}>
         {children}
       </span>
       
