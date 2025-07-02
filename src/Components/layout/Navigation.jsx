@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { 
@@ -7,140 +7,358 @@ import {
   MessageSquare, 
   User as UserIcon,
   Plus,
-  Leaf,
   Heart,
   MessageCircleQuestion,
   LogOut,
-  Flame
+  Flame,
+  Menu,
+  X,
+  Bell,
+  Settings
 } from 'lucide-react';
+import Button from '../ui/Button';
+
+// Tamatas logo component
+const TamatasLogo = ({ size = 'md' }) => {
+  const sizes = {
+    sm: 'w-6 h-6',
+    md: 'w-8 h-8',
+    lg: 'w-12 h-12'
+  };
+
+  return (
+    <div className={`${sizes[size]} rounded-xl bg-gradient-to-br from-orange-400 via-red-400 to-pink-400 flex items-center justify-center shadow-lg`}>
+      <span className="text-white font-bold text-sm">🍅</span>
+    </div>
+  );
+};
 
 const Navigation = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const menuItems = [
     { 
       name: 'Dashboard', 
       icon: Home, 
       path: '/dashboard',
-      color: 'from-vibrant-orange to-vibrant-red'
+      color: 'from-orange-400 to-red-400'
     },
     { 
       name: 'Feeds', 
       icon: Flame, 
       path: '/feeds',
-      color: 'from-vibrant-red to-vibrant-pink'
+      color: 'from-red-400 to-pink-400',
+      badge: 'Hot'
     },
     { 
       name: 'Marketplace', 
       icon: ShoppingBag, 
       path: '/marketplace',
-      color: 'from-vibrant-blue to-vibrant-cyan'
+      color: 'from-blue-400 to-cyan-400'
     },
     { 
       name: 'Favorites', 
       icon: Heart, 
       path: '/favorites',
-      color: 'from-vibrant-pink to-vibrant-red'
+      color: 'from-pink-400 to-red-400'
     },
     { 
       name: 'Messages', 
       icon: MessageSquare, 
       path: '/messages',
-      color: 'from-vibrant-cyan to-vibrant-blue'
+      color: 'from-cyan-400 to-blue-400',
+      count: 3
     },
     { 
       name: 'Forum', 
       icon: MessageCircleQuestion, 
       path: '/forum',
-      color: 'from-vibrant-purple to-vibrant-blue'
+      color: 'from-purple-400 to-blue-400'
     },
     { 
       name: 'Profile', 
       icon: UserIcon, 
       path: '/profile',
-      color: 'from-vibrant-green to-vibrant-cyan'
+      color: 'from-green-400 to-cyan-400'
     },
   ];
 
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const handleLogout = () => {
+    logout();
+    setIsMobileMenuOpen(false);
+  };
+
   return (
-    <div className="w-48 clay-nav h-screen flex flex-col">
-      {/* Header */}
-      <div className="p-3 border-b border-white/20">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-vibrant-orange via-vibrant-red to-vibrant-cyan rounded-xl flex items-center justify-center clay-animate-float">
-            <Leaf className="w-4 h-4 text-white drop-shadow-lg" />
-          </div>
+    <>
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:bg-white/80 lg:backdrop-blur-xl lg:border-r lg:border-gray-100 lg:shadow-lg">
+        {/* Header */}
+        <div className="flex items-center gap-3 p-6 border-b border-gray-100">
+          <TamatasLogo size="lg" />
           <div>
-            <h2 className="font-bold text-base clay-text-title">Fresh Trade</h2>
-            <p className="text-xs text-vibrant-green font-medium">Local Exchange</p>
+            <h2 className="text-xl font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
+              Tamatas
+            </h2>
+            <p className="text-xs text-gray-500 font-medium">Fresh Local Exchange</p>
           </div>
         </div>
-      </div>
-      
-      {/* Navigation Menu */}
-      <nav className="flex-1 p-2">
-        <div className="space-y-1">
+        
+        {/* Navigation Menu */}
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {menuItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`clay-nav-item w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-all relative overflow-hidden ${
-                  isActive ? 'active' : ''
-                }`}
-                style={isActive ? {
-                  background: `linear-gradient(135deg, ${item.color.split(' ')[1]} 0%, ${item.color.split(' ')[3]} 100%)`,
-                  color: 'white',
-                  boxShadow: 'inset 2px 2px 4px rgba(0, 0, 0, 0.1)'
-                } : {}}
+                className={`
+                  group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200
+                  ${isActive 
+                    ? `bg-gradient-to-r ${item.color} text-white shadow-lg transform scale-[1.02]` 
+                    : 'hover:bg-gray-50 text-gray-700 hover:text-gray-900 hover:scale-[1.01]'
+                  }
+                `}
               >
-                <div className={`w-5 h-5 rounded-lg flex items-center justify-center ${
-                  isActive ? 'bg-white/20' : `bg-gradient-to-br ${item.color}`
-                }`}>
-                  <item.icon className={`w-3 h-3 ${isActive ? 'text-white' : 'text-white'}`} />
+                <div className={`
+                  w-8 h-8 rounded-lg flex items-center justify-center transition-all
+                  ${isActive 
+                    ? 'bg-white/20' 
+                    : `bg-gradient-to-r ${item.color}`
+                  }
+                `}>
+                  <item.icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-white'}`} />
                 </div>
-                <span className="font-medium text-xs">{item.name}</span>
+                
+                <span className="font-medium text-sm flex-1">{item.name}</span>
+                
+                {item.count && (
+                  <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">
+                    {item.count}
+                  </span>
+                )}
+                
+                {item.badge && (
+                  <span className="bg-orange-100 text-orange-600 text-xs px-2 py-1 rounded-full font-medium">
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             );
           })}
-        </div>
-        
-        <div className="mt-4">
-          <Link to="/create-listing">
-            <button className="clay-button-primary w-full flex items-center gap-2 px-2 py-2 text-xs font-semibold">
-              <Plus className="w-3 h-3" />
+          
+          <div className="pt-4">
+            <Button 
+              variant="primary" 
+              fullWidth
+              icon={<Plus />}
+              onClick={() => window.location.href = '/create-listing'}
+              className="animate-bounce-subtle"
+            >
               Create Listing
-            </button>
-          </Link>
-        </div>
-      </nav>
+            </Button>
+          </div>
+        </nav>
 
-      {/* User Info & Logout */}
-      <div className="p-2 border-t border-white/20">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-6 h-6 bg-gradient-to-br from-vibrant-green to-vibrant-cyan rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-xs">
-              {user?.full_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
-            </span>
+        {/* User Section */}
+        <div className="p-4 border-t border-gray-100 bg-gradient-to-r from-orange-50 to-pink-50">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-green-400 to-cyan-400 flex items-center justify-center shadow-md">
+              <span className="text-white font-bold text-sm">
+                {user?.full_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm truncate text-gray-800">
+                {user?.full_name || user?.email?.split('@')[0] || 'User'}
+              </p>
+              <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="xs"
+              icon={<Settings />}
+              onClick={() => window.location.href = '/profile'}
+              className="opacity-70 hover:opacity-100"
+            />
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-medium text-xs truncate">
-              {user?.full_name || user?.email?.split('@')[0] || 'User'}
-            </p>
-            <p className="text-xs clay-text-soft truncate">{user?.email}</p>
+          
+          <Button 
+            variant="danger" 
+            size="sm"
+            fullWidth
+            icon={<LogOut />}
+            onClick={handleLogout}
+          >
+            Sign Out
+          </Button>
+        </div>
+      </div>
+
+      {/* Mobile Header */}
+      <div className="lg:hidden bg-white/90 backdrop-blur-xl border-b border-orange-100 px-4 py-3 sticky top-0 z-40 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <TamatasLogo size="md" />
+            <div>
+              <h1 className="text-lg font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
+                Tamatas
+              </h1>
+              <p className="text-xs text-gray-500 font-medium">Fresh Local Exchange</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {/* Notifications */}
+            <button className="relative p-2 text-gray-600 hover:text-orange-600 rounded-lg hover:bg-orange-50 transition-colors">
+              <Bell className="w-5 h-5" />
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+            </button>
+            
+            {/* User Avatar */}
+            <Link to="/profile" className="w-8 h-8 rounded-lg bg-gradient-to-r from-green-400 to-cyan-400 flex items-center justify-center shadow-md">
+              <span className="text-white font-bold text-xs">
+                {user?.full_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
+              </span>
+            </Link>
+            
+            {/* Menu Toggle */}
+            <button
+              onClick={toggleMobileMenu}
+              className="p-2 text-gray-600 hover:text-orange-600 rounded-lg hover:bg-orange-50 transition-colors"
+            >
+              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
         </div>
-        <button 
-          onClick={logout} 
-          className="clay-button w-full justify-start text-vibrant-red hover:bg-red-50 text-xs flex items-center gap-2"
-        >
-          <LogOut className="w-3 h-3" />
-          Sign Out
-        </button>
       </div>
-    </div>
+
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-y-0 right-0 w-80 bg-white/95 backdrop-blur-xl border-l border-gray-100 shadow-2xl">
+            {/* Mobile Menu Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gradient-to-r from-orange-50 to-pink-50">
+              <div className="flex items-center gap-3">
+                <TamatasLogo size="md" />
+                <div>
+                  <h2 className="text-lg font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
+                    Tamatas
+                  </h2>
+                  <p className="text-xs text-gray-500 font-medium">Fresh Local Exchange</p>
+                </div>
+              </div>
+              <button
+                onClick={toggleMobileMenu}
+                className="p-2 text-gray-600 hover:text-orange-600 rounded-lg hover:bg-white/50 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {/* Mobile Navigation */}
+            <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+              {menuItems.map((item) => {
+                const isActive = location.pathname === item.path;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`
+                      group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200
+                      ${isActive 
+                        ? `bg-gradient-to-r ${item.color} text-white shadow-lg` 
+                        : 'hover:bg-gray-50 text-gray-700 hover:text-gray-900'
+                      }
+                    `}
+                  >
+                    <div className={`
+                      w-8 h-8 rounded-lg flex items-center justify-center transition-all
+                      ${isActive 
+                        ? 'bg-white/20' 
+                        : `bg-gradient-to-r ${item.color}`
+                      }
+                    `}>
+                      <item.icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-white'}`} />
+                    </div>
+                    
+                    <span className="font-medium text-sm flex-1">{item.name}</span>
+                    
+                    {item.count && (
+                      <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">
+                        {item.count}
+                      </span>
+                    )}
+                    
+                    {item.badge && (
+                      <span className="bg-orange-100 text-orange-600 text-xs px-2 py-1 rounded-full font-medium">
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+              
+              <div className="pt-4">
+                <Button 
+                  variant="primary" 
+                  fullWidth
+                  icon={<Plus />}
+                  onClick={() => {
+                    window.location.href = '/create-listing';
+                    setIsMobileMenuOpen(false);
+                  }}
+                >
+                  Create Listing
+                </Button>
+              </div>
+            </nav>
+
+            {/* Mobile User Section */}
+            <div className="p-4 border-t border-gray-100 bg-gradient-to-r from-orange-50 to-pink-50">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-green-400 to-cyan-400 flex items-center justify-center shadow-md">
+                  <span className="text-white font-bold text-sm">
+                    {user?.full_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate text-gray-800">
+                    {user?.full_name || user?.email?.split('@')[0] || 'User'}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="xs"
+                  icon={<Settings />}
+                  onClick={() => {
+                    window.location.href = '/profile';
+                    setIsMobileMenuOpen(false);
+                  }}
+                />
+              </div>
+              
+              <Button 
+                variant="danger" 
+                size="sm"
+                fullWidth
+                icon={<LogOut />}
+                onClick={handleLogout}
+              >
+                Sign Out
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

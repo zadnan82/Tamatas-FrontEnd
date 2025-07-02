@@ -4,23 +4,23 @@ import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import { ToastProvider } from './components/ui/Toast';
 
 // Import pages
-import HomePage from './pages/HomePage';
-import Dashboard from './pages/Dashboard';
-import Marketplace from './pages/Marketplace';
-import CreateListing from './pages/CreateListing';
-import ListingDetails from './pages/ListingDetails';
-import Messages from './pages/Messages';
-import Profile from './pages/Profile';
-import UserProfile from './pages/UserProfile';
-import Favorites from './pages/Favorites';
-import Feeds from './pages/Feeds';
-import Forum from './pages/Forum';
-import Topic from './pages/Topic';
-import CreateForumTopic from './pages/CreateForumTopic';
-import Contact from './pages/Contact';
+import HomePage from './Pages/HomePage.jsx';
+import Dashboard from './Pages/Dashboard.jsx';
+import Marketplace from './Pages/MarketPlace.jsx';
+import CreateListing from './Pages/CreateListing.jsx';
+import ListingDetails from './Pages/ListingDetails';
+import Messages from './Pages/Messages.jsx';
+import Profile from './Pages/Profile';
+import UserProfile from './Pages/UserProfile';
+import Favorites from './Pages/Favorites';
+import Feeds from './Pages/Feeds';
+import Forum from './Pages/Forum';
+import Topic from './Pages/Topic';
+import CreateForumTopic from './Pages/CreateForumTopic';
+import Contact from './Pages/Contact';
 
 // Import layout
-import Layout from './components/layout/Layout';
+import Layout from './Components/layout/layout.jsx';
 import LoadingSpinner from './components/ui/LoadingSpinner';
 
 const AppContent = () => {
@@ -28,10 +28,16 @@ const AppContent = () => {
 
   if (loading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50">
+      <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-pink-50">
         <div className="text-center">
-          <LoadingSpinner size="xl" />
-          <p className="text-gray-600 mt-4">Loading Fresh Trade...</p>
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 via-red-400 to-pink-400 flex items-center justify-center shadow-lg mb-4 mx-auto animate-pulse">
+            <span className="text-2xl">🍅</span>
+          </div>
+          <div className="loading-spinner mx-auto mb-4"></div>
+          <h2 className="text-xl font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent mb-2">
+            Tamatas
+          </h2>
+          <p className="text-gray-600">Loading Fresh Local Exchange...</p>
         </div>
       </div>
     );
@@ -66,7 +72,9 @@ export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
-        <AppContent />
+        <div className="app">
+          <AppContent />
+        </div>
       </ToastProvider>
     </AuthProvider>
   );

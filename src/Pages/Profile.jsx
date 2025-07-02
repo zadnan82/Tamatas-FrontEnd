@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { useToast } from '../components/ui/Toast.jsx';
-import Button from '../components/ui/Button.jsx';
+import Button from '../components/ui/button.jsx';
 import Input from '../components/ui/Input.jsx';
 import Textarea from '../components/ui/Textarea.jsx';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card.jsx';

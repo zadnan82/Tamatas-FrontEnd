@@ -1,7 +1,23 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ui/Toast';
-import { ShoppingBag, MessageSquare, Heart, Leaf, Users, Globe, TrendingUp, Star, ArrowRight } from 'lucide-react';
+import Button from '../components/ui/button';
+import { Input } from '../components/ui/Input';
+import { Card, CardContent, FeatureCard, StatsCard } from '../components/ui/Card';
+import { 
+  ShoppingBag, 
+  MessageSquare, 
+  Heart, 
+  Users, 
+  Globe, 
+  TrendingUp, 
+  Star, 
+  ArrowRight,
+  Leaf,
+  Shield,
+  Clock,
+  MapPin
+} from 'lucide-react';
 
 const HomePage = () => {
   const { login, register } = useAuth();
@@ -21,10 +37,10 @@ const HomePage = () => {
     try {
       if (isLogin) {
         await login(formData.email, formData.password);
-        toast.success('Welcome back!');
+        toast.success('Welcome back to Tamatas!');
       } else {
         await register(formData.email, formData.password, formData.full_name);
-        toast.success('Account created successfully!');
+        toast.success('Welcome to Tamatas! Your account has been created.');
       }
     } catch (error) {
       toast.error(error.message);
@@ -43,251 +59,263 @@ const HomePage = () => {
 
   const features = [
     {
-      icon: ShoppingBag,
+      icon: <ShoppingBag />,
       title: "Local Marketplace",
-      description: "Browse fresh produce from your neighbors nearby.",
-      color: "from-vibrant-orange to-vibrant-red"
+      description: "Browse fresh produce from your neighbors and local farmers."
     },
     {
-      icon: MessageSquare,
+      icon: <MessageSquare />,
       title: "Direct Communication", 
-      description: "Message sellers directly to arrange trades.",
-      color: "from-vibrant-blue to-vibrant-cyan"
+      description: "Message sellers directly to arrange trades and pickups."
     },
     {
-      icon: Heart,
+      icon: <Shield />,
+      title: "Trusted Community",
+      description: "Join verified local growers with ratings and reviews."
+    },
+    {
+      icon: <Heart />,
       title: "Community Driven",
-      description: "Build relationships with local growers.",
-      color: "from-vibrant-pink to-vibrant-red"
+      description: "Build lasting relationships with local food producers."
     },
     {
-      icon: Users,
-      title: "Trusted Network",
-      description: "Join verified local farmers and gardeners.",
-      color: "from-vibrant-purple to-vibrant-blue"
-    },
-    {
-      icon: Globe,
+      icon: <Globe />,
       title: "Sustainable Trading",
-      description: "Support local agriculture sustainably.",
-      color: "from-vibrant-green to-vibrant-cyan"
+      description: "Support local agriculture and reduce food waste."
     },
     {
-      icon: TrendingUp,
-      title: "Growing Community",
-      description: "Fastest-growing local food network.",
-      color: "from-vibrant-cyan to-vibrant-purple"
+      icon: <Clock />,
+      title: "Fresh & Fast",
+      description: "Get the freshest produce delivered quickly from nearby."
     }
   ];
 
   const stats = [
-    { number: "5,000+", label: "Active Users", icon: Users },
-    { number: "15,000+", label: "Successful Trades", icon: ShoppingBag },
-    { number: "50+", label: "Cities", icon: Globe },
-    { number: "4.9", label: "Average Rating", icon: Star }
+    { 
+      title: "Active Users", 
+      value: "5,000+", 
+      icon: <Users />,
+      trend: 15
+    },
+    { 
+      title: "Successful Trades", 
+      value: "15,000+", 
+      icon: <ShoppingBag />,
+      trend: 23
+    },
+    { 
+      title: "Cities", 
+      value: "50+", 
+      icon: <MapPin />,
+      trend: 8
+    },
+    { 
+      title: "Average Rating", 
+      value: "4.9", 
+      icon: <Star />,
+      trend: 5
+    }
   ];
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-pink-50">
       {/* Hero Section */}
-      <section className="container mx-auto px-4 py-6">
-        <div className="text-center mb-6">
-          <div className="clay-animate-float inline-block mb-3">
-            <div className="w-16 h-16 bg-gradient-to-br from-vibrant-orange via-vibrant-red to-vibrant-cyan rounded-2xl flex items-center justify-center clay-card">
-              <Leaf className="w-8 h-8 text-white drop-shadow-lg" />
+      <section className="container mx-auto px-4 py-12">
+        {/* Hero Header */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-4 mb-6">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 via-red-400 to-pink-400 flex items-center justify-center shadow-lg">
+              <span className="text-2xl">🍅</span>
+            </div>
+            <div className="text-left">
+              <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 bg-clip-text text-transparent">
+                Tamatas
+              </h1>
+              <p className="text-sm text-gray-600 font-medium">Fresh Local Exchange</p>
             </div>
           </div>
           
-          <h1 className="clay-text-title text-3xl md:text-4xl font-bold mb-3 max-w-4xl mx-auto leading-tight">
-            Fresh Trade
-          </h1>
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4 max-w-4xl mx-auto leading-tight">
+            Connect with Local Farmers & Fresh Produce
+          </h2>
           
-          <p className="clay-text-subtitle text-sm md:text-base max-w-2xl mx-auto mb-4 leading-relaxed">
-            The marketplace for backyard gardeners and local farmers to sell, buy, and trade fresh produce directly with their community.
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto mb-8 leading-relaxed">
+            The marketplace where backyard gardeners and local farmers trade fresh, seasonal produce directly with their community.
           </p>
           
-          <div className="flex flex-wrap gap-2 justify-center mb-6">
-            <div className="clay-badge clay-badge-green px-3 py-1 text-xs font-semibold">
+          <div className="flex flex-wrap gap-3 justify-center mb-8">
+            <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full border border-orange-200 text-sm font-medium text-orange-700">
               🌱 100% Local
-            </div>
-            <div className="clay-badge clay-badge-blue px-3 py-1 text-xs font-semibold">
+            </span>
+            <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full border border-blue-200 text-sm font-medium text-blue-700">
               🤝 Community Driven
-            </div>
-            <div className="clay-badge clay-badge-purple px-3 py-1 text-xs font-semibold">
+            </span>
+            <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full border border-green-200 text-sm font-medium text-green-700">
               🌍 Sustainable
-            </div>
+            </span>
           </div>
         </div>
 
-        {/* Stats Section */}
-        <div className="clay-grid clay-grid-2 md:clay-grid-4 mb-6">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
           {stats.map((stat, index) => (
-            <div key={index} className="clay-card p-4 text-center group hover:scale-105 transition-transform duration-300">
-              <div className="w-10 h-10 bg-gradient-to-br from-vibrant-green to-vibrant-cyan rounded-xl flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
-                <stat.icon className="w-5 h-5 text-white" />
-              </div>
-              <div className="clay-text-title text-xl font-bold mb-1">{stat.number}</div>
-              <div className="clay-text-soft text-xs font-medium">{stat.label}</div>
-            </div>
+            <StatsCard
+              key={index}
+              title={stat.title}
+              value={stat.value}
+              icon={stat.icon}
+              trend={stat.trend}
+              className="text-center"
+            />
           ))}
         </div>
 
         {/* Auth Form */}
         <div className="max-w-md mx-auto">
-          <div className="clay-card p-5 bg-white/60 backdrop-blur-sm">
-            <div className="text-center mb-4">
-              <h3 className="clay-text-title text-lg font-bold mb-2">
-                {isLogin ? 'Welcome Back' : 'Join Fresh Trade'}
+          <Card gradient className="p-6">
+            <div className="text-center mb-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
+                {isLogin ? 'Welcome Back' : 'Join Tamatas'}
               </h3>
-              <p className="clay-text-soft text-xs">
+              <p className="text-sm text-gray-600">
                 {isLogin ? 'Sign in to your account' : 'Create your account today'}
               </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {!isLogin && (
-                <div>
-                  <label className="block clay-text-soft text-xs font-medium mb-2">Full Name</label>
-                  <input
-                    type="text"
-                    value={formData.full_name}
-                    onChange={(e) => setFormData({...formData, full_name: e.target.value})}
-                    className="clay-input w-full"
-                    placeholder="Enter your full name"
-                    required={!isLogin}
-                  />
-                </div>
+                <Input
+                  label="Full Name"
+                  value={formData.full_name}
+                  onChange={(e) => setFormData({...formData, full_name: e.target.value})}
+                  placeholder="Enter your full name"
+                  required={!isLogin}
+                />
               )}
               
-              <div>
-                <label className="block clay-text-soft text-xs font-medium mb-2">Email</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  className="clay-input w-full"
-                  placeholder="Enter your email"
-                  required
-                />
-              </div>
+              <Input
+                label="Email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({...formData, email: e.target.value})}
+                placeholder="Enter your email"
+                required
+              />
               
-              <div>
-                <label className="block clay-text-soft text-xs font-medium mb-2">Password</label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  className="clay-input w-full"
-                  placeholder="Enter your password"
-                  required
-                />
-              </div>
+              <Input
+                label="Password"
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({...formData, password: e.target.value})}
+                placeholder="Enter your password"
+                required
+              />
               
-              <button 
+              <Button 
                 type="submit" 
-                className={`clay-button-primary w-full py-3 font-semibold text-white text-sm ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                disabled={loading}
+                variant="primary"
+                size="lg"
+                fullWidth
+                loading={loading}
+                icon={<ArrowRight />}
               >
-                {loading ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="clay-loading w-4 h-4 rounded-full"></div>
-                    Please wait...
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center gap-2">
-                    {isLogin ? 'Sign In' : 'Create Account'}
-                    <ArrowRight className="w-4 h-4" />
-                  </div>
-                )}
-              </button>
+                {isLogin ? 'Sign In' : 'Create Account'}
+              </Button>
             </form>
             
-            <div className="text-center mt-4">
+            <div className="text-center mt-6">
               <button
                 onClick={() => setIsLogin(!isLogin)}
-                className="clay-text-soft hover:text-gray-700 text-xs font-medium transition-colors"
+                className="text-sm text-gray-600 hover:text-orange-600 font-medium transition-colors"
               >
                 {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
               </button>
             </div>
             
             {/* Demo Account */}
-            <div className="mt-4 clay-card p-3 bg-gradient-to-br from-vibrant-green/20 to-vibrant-cyan/20">
-              <p className="clay-text-soft text-xs font-medium mb-2 text-center">Try with demo account:</p>
-              <div className="bg-white/80 rounded-lg p-3 mb-3 backdrop-blur-sm">
-                <p className="text-xs clay-text-soft">Email: farmer@example.com</p>
-                <p className="text-xs clay-text-soft">Password: password123</p>
+            <Card className="mt-6 p-4 bg-gradient-to-r from-orange-50 to-pink-50 border-orange-200">
+              <p className="text-sm font-medium text-center mb-3 text-gray-700">Try with demo account:</p>
+              <div className="bg-white/80 rounded-lg p-3 mb-3 backdrop-blur-sm border border-white/50">
+                <p className="text-xs text-gray-600">Email: farmer@example.com</p>
+                <p className="text-xs text-gray-600">Password: password123</p>
               </div>
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
+                fullWidth
                 onClick={useDemoAccount}
-                className="clay-button w-full text-xs font-medium"
               >
                 Use Demo Account
-              </button>
-            </div>
-          </div>
+              </Button>
+            </Card>
+          </Card>
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="container mx-auto px-4 py-6">
-        <div className="text-center mb-6">
-          <h2 className="clay-text-title text-xl font-bold mb-2">Why Choose Fresh Trade?</h2>
-          <p className="clay-text-subtitle text-sm max-w-2xl mx-auto">
+      <section className="container mx-auto px-4 py-16">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Why Choose Tamatas?</h2>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Join thousands of farmers and gardeners creating a sustainable local food network
           </p>
         </div>
         
-        <div className="clay-grid clay-grid-2 md:clay-grid-3 mb-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {features.map((feature, index) => (
-            <div key={index} className="clay-card p-4 text-center group hover:scale-105 transition-all duration-300">
-              <div className={`w-12 h-12 bg-gradient-to-br ${feature.color} rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform duration-300`}>
-                <feature.icon className="w-6 h-6 text-white drop-shadow-sm" />
-              </div>
-              <h3 className="clay-text-title text-sm font-bold mb-2">{feature.title}</h3>
-              <p className="clay-text-soft leading-relaxed text-xs">{feature.description}</p>
-            </div>
+            <FeatureCard
+              key={index}
+              icon={feature.icon}
+              title={feature.title}
+              description={feature.description}
+            />
           ))}
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="container mx-auto px-4 py-6">
-        <div className="clay-card p-6 text-center bg-gradient-to-br from-vibrant-orange/20 to-vibrant-red/20">
-          <h2 className="clay-text-title text-xl font-bold mb-2">Ready to Start Trading?</h2>
-          <p className="clay-text-subtitle text-sm mb-4 max-w-2xl mx-auto">
+      <section className="container mx-auto px-4 py-16">
+        <Card gradient className="p-12 text-center">
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Ready to Start Trading?</h2>
+          <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
             Join our growing community of local food enthusiasts and start making meaningful connections today.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button 
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button 
+              variant="primary"
+              size="lg"
               onClick={() => setIsLogin(false)}
-              className="clay-button-primary px-6 py-3 font-semibold text-white flex items-center gap-2 justify-center text-sm"
+              icon={<ArrowRight />}
             >
               Get Started Free
-              <ArrowRight className="w-4 h-4" />
-            </button>
-            <button className="clay-button px-6 py-3 font-semibold text-sm">
+            </Button>
+            <Button 
+              variant="outline"
+              size="lg"
+            >
               Learn More
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
       </section>
 
       {/* Footer */}
-      <footer className="container mx-auto px-4 py-4">
-        <div className="clay-card p-4 bg-white/40">
+      <footer className="container mx-auto px-4 py-8">
+        <Card className="p-6 bg-white/60">
           <div className="text-center">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-vibrant-orange via-vibrant-red to-vibrant-cyan rounded-xl flex items-center justify-center">
-                <Leaf className="w-4 h-4 text-white" />
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-orange-400 via-red-400 to-pink-400 flex items-center justify-center">
+                <span className="text-lg">🍅</span>
               </div>
-              <span className="clay-text-title text-sm font-bold">Fresh Trade</span>
+              <span className="text-lg font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
+                Tamatas
+              </span>
             </div>
-            <p className="clay-text-soft text-xs">
-              © 2024 Fresh Trade. Building sustainable local food communities.
+            <p className="text-sm text-gray-600">
+              © 2024 Tamatas. Building sustainable local food communities.
             </p>
           </div>
-        </div>
+        </Card>
       </footer>
     </div>
   );
