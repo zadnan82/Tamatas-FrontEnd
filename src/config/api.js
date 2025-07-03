@@ -1,4 +1,5 @@
-// src/config/api.js - Updated for real database connection
+ 
+// src/config/api.js - Complete fixed version with all methods
 const API_CONFIG = {
   BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:8001',
   
@@ -11,7 +12,7 @@ const API_CONFIG = {
   USERS: {
     UPDATE_ME: '/users/me',
     PROFILE: (userId) => `/users/${userId}`,
-    REVIEWS: (userId) => `/users/${userId}/reviews`,
+    REVIEWS: (userId) => `/reviews/user/${userId}`,
   },
   
   LISTINGS: {
@@ -47,17 +48,13 @@ const API_CONFIG = {
     TOPIC_POSTS: (topicId) => `/forum/topics/${topicId}/posts`,
   },
   
-  UPLOAD: {
-    IMAGE: '/upload/image',
-    IMAGES: '/upload/images',
-  },
-  
   CONTACT: {
     BASE: '/contact',
   },
 };
 
 class ApiClient {
+  
   constructor() {
     this.baseURL = API_CONFIG.BASE_URL;
     this.token = localStorage.getItem('auth_token');
@@ -213,7 +210,16 @@ class ApiClient {
     });
   }
 
-  // Listing methods - now connected to real database
+  // User profile methods - FIXED
+  async getUserProfile(userId) {
+    return this.request(API_CONFIG.USERS.PROFILE(userId));
+  }
+
+  async getUserReviews(userId) {
+    return this.request(API_CONFIG.USERS.REVIEWS(userId));
+  }
+
+  // Listing methods - Fixed for real database
   async createListing(listingData) {
     const requiredFields = ['title', 'category', 'listing_type', 'images'];
     const missingFields = requiredFields.filter(field => {
@@ -305,38 +311,95 @@ class ApiClient {
     return this.request(API_CONFIG.LISTINGS.FEEDS);
   }
 
-  // Messages methods
-  async getMessages() {
-    return this.request(API_CONFIG.MESSAGES.BASE);
+ // Messages methods - Enhanced version
+async getMessages() {
+  try {
+    const messages = await this.request(API_CONFIG.MESSAGES.BASE);
+    // Ensure dates are properly parsed
+    return messages.map(msg => ({
+      ...msg,
+      created_date: new Date(msg.created_date),
+      read_date: msg.read_date ? new Date(msg.read_date) : null
+    }));
+  } catch (error) {
+    console.error('Failed to get messages:', error);
+    throw new Error('Failed to load messages. Please try again.');
+  }
+}
+
+async sendMessage(messageData) {
+  // Validate required fields
+  if (!messageData.recipient_id || !messageData.content) {
+    throw new Error('Recipient and message content are required');
   }
 
-  async sendMessage(messageData) {
-    return this.request(API_CONFIG.MESSAGES.BASE, {
+  try {
+    return await this.request(API_CONFIG.MESSAGES.BASE, {
       method: 'POST',
-      body: JSON.stringify(messageData),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ...messageData,
+        // Ensure dates are properly formatted if present
+        created_date: messageData.created_date 
+          ? new Date(messageData.created_date).toISOString() 
+          : undefined
+      }),
     });
+  } catch (error) {
+    console.error('Failed to send message:', error);
+    throw new Error('Failed to send message. Please check your connection and try again.');
+  }
+}
+
+async getConversation(userId) {
+  if (!userId) {
+    throw new Error('User ID is required to get conversation');
   }
 
-  async getConversation(userId) {
-    return this.request(API_CONFIG.MESSAGES.CONVERSATION(userId));
+  try {
+    const messages = await this.request(API_CONFIG.MESSAGES.CONVERSATION(userId));
+    return messages.map(msg => ({
+      ...msg,
+      created_date: new Date(msg.created_date),
+      read_date: msg.read_date ? new Date(msg.read_date) : null
+    }));
+  } catch (error) {
+    console.error(`Failed to get conversation with user ${userId}:`, error);
+    throw new Error('Failed to load conversation. Please try again.');
+  }
+}
+
+async markMessageRead(messageId) {
+  if (!messageId) {
+    throw new Error('Message ID is required');
   }
 
-  async markMessageRead(messageId) {
-    return this.request(API_CONFIG.MESSAGES.MARK_READ(messageId), {
+  try {
+    const response = await this.request(API_CONFIG.MESSAGES.MARK_READ(messageId), {
       method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
+    
+    if (response.status !== 200) {
+      throw new Error('Failed to mark message as read');
+    }
+    
+    return response;
+  } catch (error) {
+    console.error(`Failed to mark message ${messageId} as read:`, error);
+    throw new Error('Failed to update message status. Please try again.');
   }
-
-  // Reviews methods
+}
+  // Reviews methods - Fixed
   async createReview(reviewData) {
     return this.request(API_CONFIG.REVIEWS.BASE, {
       method: 'POST',
       body: JSON.stringify(reviewData),
     });
-  }
-
-  async getUserReviews(userId) {
-    return this.request(API_CONFIG.REVIEWS.USER_REVIEWS(userId));
   }
 
   // Favorites methods
@@ -393,50 +456,7 @@ class ApiClient {
     });
   }
 
-  // Upload methods
-  async uploadImage(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    const response = await fetch(`${this.baseURL}${API_CONFIG.UPLOAD.IMAGE}`, {
-      method: 'POST',
-      headers: {
-        Authorization: this.token ? `Bearer ${this.token}` : undefined,
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Upload failed');
-    }
-
-    return response.json();
-  }
-
-  async uploadImages(files) {
-    const formData = new FormData();
-    files.forEach(file => {
-      formData.append('files', file);
-    });
-    
-    const response = await fetch(`${this.baseURL}${API_CONFIG.UPLOAD.IMAGES}`, {
-      method: 'POST',
-      headers: {
-        Authorization: this.token ? `Bearer ${this.token}` : undefined,
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Upload failed');
-    }
-
-    return response.json();
-  }
-
-  // Contact method
+  // Contact method - Fixed
   async sendContact(contactData) {
     return this.request(API_CONFIG.CONTACT.BASE, {
       method: 'POST',

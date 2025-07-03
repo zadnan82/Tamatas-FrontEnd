@@ -1,7 +1,7 @@
-import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import StarRating from '@/components/shared/StarRating';
+import React from 'react'; 
+import Card, { CardContent } from '../ui/Card';
+import { Avatar, AvatarFallback} from '../../components/ui/avatar';
+import StarRating from '../shared/StarRating';
 import { format } from 'date-fns';
 
 export default function ReviewList({ reviews }) {
