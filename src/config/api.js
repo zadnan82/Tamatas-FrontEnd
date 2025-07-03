@@ -1,5 +1,4 @@
- 
-// src/config/api.js - Complete fixed version with all methods
+// src/config/api.js - Enhanced version with better auth handling
 const API_CONFIG = {
   BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:8001',
   
@@ -58,6 +57,8 @@ class ApiClient {
   constructor() {
     this.baseURL = API_CONFIG.BASE_URL;
     this.token = localStorage.getItem('auth_token');
+    this.refreshing = false;
+    this.requestQueue = [];
   }
 
   setToken(token) {
@@ -81,8 +82,44 @@ class ApiClient {
     return headers;
   }
 
+  // Enhanced token validation
+  isTokenValid() {
+    if (!this.token) return false;
+    
+    try {
+      // Basic JWT structure check
+      const parts = this.token.split('.');
+      if (parts.length !== 3) return false;
+      
+      // Decode payload to check expiration
+      const payload = JSON.parse(atob(parts[1]));
+      const now = Date.now() / 1000;
+      
+      // Check if token expires within next 60 seconds
+      return payload.exp && payload.exp > (now + 60);
+    } catch (error) {
+      console.error('Token validation failed:', error);
+      return false;
+    }
+  }
+
+  // Clear auth state and redirect to login
+  handleAuthFailure() {
+    this.setToken(null);
+    // Don't redirect automatically, let the app handle it
+    window.dispatchEvent(new CustomEvent('auth:expired'));
+  }
+
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
+    
+    // Check token validity before making request
+    if (this.token && !this.isTokenValid()) {
+      console.warn('Token appears to be expired or invalid');
+      this.handleAuthFailure();
+      throw new Error('Authentication required');
+    }
+
     const config = {
       headers: this.getHeaders(),
       ...options,
@@ -99,7 +136,15 @@ class ApiClient {
       console.log('Response status:', response.status);
       console.log('Response ok:', response.ok);
       
+      // Handle different types of failures
       if (!response.ok) {
+        // Handle auth failures specifically
+        if (response.status === 401) {
+          console.warn('Received 401 Unauthorized response');
+          this.handleAuthFailure();
+          throw new Error('Authentication required');
+        }
+
         let errorData;
         const contentType = response.headers.get('content-type');
         
@@ -162,25 +207,54 @@ class ApiClient {
   }
 
   // Auth methods
-  async login(email, password) {
-    const formData = new FormData();
-    formData.append('username', email);
-    formData.append('password', password);
-    
-    const response = await fetch(`${this.baseURL}${API_CONFIG.AUTH.LOGIN}`, {
-      method: 'POST',
-      body: formData,
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Login failed');
-    }
-    
-    const data = await response.json();
-    this.setToken(data.access_token);
-    return data;
+  // In your API client, make sure the login method looks like this:
+
+async login(email, password) {
+  console.log('🔐 API Client: Starting login request');
+  
+  const formData = new FormData();
+  formData.append('username', email);
+  formData.append('password', password);
+  
+  const response = await fetch(`${this.baseURL}/auth/login`, {
+    method: 'POST',
+    body: formData,
+  });
+  
+  console.log('🔐 API Client: Login response status:', response.status);
+  
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error('🔐 API Client: Login failed with error:', errorData);
+    throw new Error(errorData.detail || 'Login failed');
   }
+  
+  const data = await response.json();
+  console.log('🔐 API Client: Login response data:', data);
+  console.log('🔐 API Client: Access token received:', data.access_token ? 'YES' : 'NO');
+  
+  // CRITICAL: This line must be here and must work
+  if (data.access_token) {
+    console.log('🔐 API Client: Setting token...');
+    this.setToken(data.access_token);
+    
+    // Verify token was set
+    const tokenInStorage = localStorage.getItem('auth_token');
+    console.log('🔐 API Client: Token in storage after setToken:', tokenInStorage ? 'SET' : 'MISSING');
+    console.log('🔐 API Client: Token in this.token:', this.token ? 'SET' : 'MISSING');
+    
+    if (!tokenInStorage || !this.token) {
+      console.error('❌ API Client: Failed to set token properly');
+      throw new Error('Failed to store authentication token');
+    }
+  } else {
+    console.error('❌ API Client: No access_token in response');
+    throw new Error('No access token received from server');
+  }
+  
+  console.log('✅ API Client: Login completed successfully');
+  return data;
+}
 
   async register(userData) {
     const data = await this.request(API_CONFIG.AUTH.REGISTER, {
@@ -210,7 +284,7 @@ class ApiClient {
     });
   }
 
-  // User profile methods - FIXED
+  // User profile methods
   async getUserProfile(userId) {
     return this.request(API_CONFIG.USERS.PROFILE(userId));
   }
@@ -311,90 +385,97 @@ class ApiClient {
     return this.request(API_CONFIG.LISTINGS.FEEDS);
   }
 
- // Messages methods - Enhanced version
-async getMessages() {
-  try {
-    const messages = await this.request(API_CONFIG.MESSAGES.BASE);
-    // Ensure dates are properly parsed
-    return messages.map(msg => ({
-      ...msg,
-      created_date: new Date(msg.created_date),
-      read_date: msg.read_date ? new Date(msg.read_date) : null
-    }));
-  } catch (error) {
-    console.error('Failed to get messages:', error);
-    throw new Error('Failed to load messages. Please try again.');
-  }
-}
-
-async sendMessage(messageData) {
-  // Validate required fields
-  if (!messageData.recipient_id || !messageData.content) {
-    throw new Error('Recipient and message content are required');
-  }
-
-  try {
-    return await this.request(API_CONFIG.MESSAGES.BASE, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        ...messageData,
-        // Ensure dates are properly formatted if present
-        created_date: messageData.created_date 
-          ? new Date(messageData.created_date).toISOString() 
-          : undefined
-      }),
-    });
-  } catch (error) {
-    console.error('Failed to send message:', error);
-    throw new Error('Failed to send message. Please check your connection and try again.');
-  }
-}
-
-async getConversation(userId) {
-  if (!userId) {
-    throw new Error('User ID is required to get conversation');
-  }
-
-  try {
-    const messages = await this.request(API_CONFIG.MESSAGES.CONVERSATION(userId));
-    return messages.map(msg => ({
-      ...msg,
-      created_date: new Date(msg.created_date),
-      read_date: msg.read_date ? new Date(msg.read_date) : null
-    }));
-  } catch (error) {
-    console.error(`Failed to get conversation with user ${userId}:`, error);
-    throw new Error('Failed to load conversation. Please try again.');
-  }
-}
-
-async markMessageRead(messageId) {
-  if (!messageId) {
-    throw new Error('Message ID is required');
-  }
-
-  try {
-    const response = await this.request(API_CONFIG.MESSAGES.MARK_READ(messageId), {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    if (response.status !== 200) {
-      throw new Error('Failed to mark message as read');
+  // Enhanced Messages methods with better error handling
+  async getMessages() {
+    try {
+      const messages = await this.request(API_CONFIG.MESSAGES.BASE);
+      // Ensure dates are properly parsed
+      return messages.map(msg => ({
+        ...msg,
+        created_date: new Date(msg.created_date),
+        read_date: msg.read_date ? new Date(msg.read_date) : null
+      }));
+    } catch (error) {
+      console.error('Failed to get messages:', error);
+      if (error.status === 401) {
+        throw new Error('Please log in to view your messages');
+      }
+      throw new Error('Failed to load messages. Please try again.');
     }
-    
-    return response;
-  } catch (error) {
-    console.error(`Failed to mark message ${messageId} as read:`, error);
-    throw new Error('Failed to update message status. Please try again.');
   }
-}
-  // Reviews methods - Fixed
+
+  async sendMessage(messageData) {
+    // Validate required fields
+    if (!messageData.recipient_id || !messageData.content) {
+      throw new Error('Recipient and message content are required');
+    }
+
+    try {
+      return await this.request(API_CONFIG.MESSAGES.BASE, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...messageData,
+          // Ensure dates are properly formatted if present
+          created_date: messageData.created_date 
+            ? new Date(messageData.created_date).toISOString() 
+            : undefined
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      if (error.status === 401) {
+        throw new Error('Please log in to send messages');
+      }
+      throw new Error('Failed to send message. Please check your connection and try again.');
+    }
+  }
+
+  async getConversation(userId) {
+    if (!userId) {
+      throw new Error('User ID is required to get conversation');
+    }
+
+    try {
+      const messages = await this.request(API_CONFIG.MESSAGES.CONVERSATION(userId));
+      return messages.map(msg => ({
+        ...msg,
+        created_date: new Date(msg.created_date),
+        read_date: msg.read_date ? new Date(msg.read_date) : null
+      }));
+    } catch (error) {
+      console.error(`Failed to get conversation with user ${userId}:`, error);
+      if (error.status === 401) {
+        throw new Error('Please log in to view conversations');
+      }
+      throw new Error('Failed to load conversation. Please try again.');
+    }
+  }
+
+  async markMessageRead(messageId) {
+    if (!messageId) {
+      throw new Error('Message ID is required');
+    }
+
+    try {
+      return await this.request(API_CONFIG.MESSAGES.MARK_READ(messageId), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+    } catch (error) {
+      console.error(`Failed to mark message ${messageId} as read:`, error);
+      if (error.status === 401) {
+        throw new Error('Please log in to mark messages as read');
+      }
+      throw new Error('Failed to update message status. Please try again.');
+    }
+  }
+
+  // Reviews methods
   async createReview(reviewData) {
     return this.request(API_CONFIG.REVIEWS.BASE, {
       method: 'POST',
@@ -456,7 +537,7 @@ async markMessageRead(messageId) {
     });
   }
 
-  // Contact method - Fixed
+  // Contact method
   async sendContact(contactData) {
     return this.request(API_CONFIG.CONTACT.BASE, {
       method: 'POST',

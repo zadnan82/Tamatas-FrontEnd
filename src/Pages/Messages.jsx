@@ -59,7 +59,46 @@ const Messages = () => {
 
   // Network status detection
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+// Add this to your Messages.jsx file to debug authentication
+// Put this right after the user state and before the useEffect hooks
 
+useEffect(() => {
+  // Debug authentication state
+  console.log('=== AUTH DEBUG ===');
+  console.log('User:', user);
+  console.log('Current token:', localStorage.getItem('auth_token'));
+  console.log('API Client token:', apiClient.token);
+  console.log('Is authenticated:', !!user);
+  
+  // Check if token is valid
+  if (apiClient.token) {
+    try {
+      const parts = apiClient.token.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1]));
+        console.log('Token payload:', payload);
+        console.log('Token expires at:', new Date(payload.exp * 1000));
+        console.log('Token is expired:', payload.exp < Date.now() / 1000);
+        console.log('Time until expiry:', payload.exp - Date.now() / 1000, 'seconds');
+      }
+    } catch (e) {
+      console.error('Error parsing token:', e);
+    }
+  }
+  console.log('==================');
+}, [user]);
+
+// Also add this before the sendMessage function to log the headers being sent
+const debugSendMessage = async (messageData) => {
+  console.log('=== SEND MESSAGE DEBUG ===');
+  console.log('Message data:', messageData);
+  console.log('Current token before send:', localStorage.getItem('auth_token'));
+  console.log('API client token before send:', apiClient.token);
+  console.log('Headers that will be sent:', apiClient.getHeaders());
+  console.log('==========================');
+  
+  return apiClient.sendMessage(messageData);
+};
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
@@ -306,26 +345,8 @@ const Messages = () => {
     try {
       const conversationMessages = await apiClient.getConversation(participantId);
       
-      // Mark messages as read when loading the conversation
-      const unreadMessages = conversationMessages.filter(
-        msg => msg.recipient_id === user.id && !msg.read
-      );
-      
-      if (unreadMessages.length > 0) {
-        await Promise.all(
-          unreadMessages.map(msg => 
-            apiClient.markMessageRead(msg.id).catch(error => 
-              console.error('Failed to mark message as read:', error)
-            )
-          )
-        );
-        
-        // Update conversation unread count
-        setConversations(prev => prev.map(conv => 
-          conv.id === participantId ? { ...conv, unreadCount: 0 } : conv
-        ));
-      }
-      
+      // DON'T automatically mark messages as read - remove this problematic code
+      // Just load and display the messages
       setMessages(conversationMessages.sort((a, b) => 
         new Date(a.created_date) - new Date(b.created_date)
       ));
@@ -334,103 +355,136 @@ const Messages = () => {
     }
   };
 
-  // Enhanced sendMessage with retry logic
-  const sendMessage = async (e) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !selectedConversation || sending) return;
-
-    const messageContent = newMessage.trim();
-    setSending(true);
-    
-    // Clear input immediately
-    setNewMessage('');
-    
-    // Add optimistic message
-    const optimisticMessage = {
-      id: `temp-${Date.now()}`,
-      sender_id: user.id,
-      recipient_id: selectedConversation.participant.id,
-      content: messageContent,
-      created_date: new Date().toISOString(),
-      read: false,
-      listing_id: selectedConversation.listing?.id || null,
-      sending: true,
-      failed: false
-    };
-
-    setMessages(prev => [...prev, optimisticMessage]);
-
-    const messageData = {
-      recipient_id: selectedConversation.participant.id,
-      content: messageContent,
-      listing_id: selectedConversation.listing?.id || null
-    };
-
+  // Add manual mark as read function for when user clicks on a message
+  const markAsRead = async (messageId) => {
     try {
-      const sentMessage = await apiClient.sendMessage(messageData);
-      
-      // Replace optimistic message with real message
+      await apiClient.markMessageRead(messageId);
+      // Update the message in the local state
       setMessages(prev => prev.map(msg => 
-        msg.id === optimisticMessage.id ? sentMessage : msg
+        msg.id === messageId ? { ...msg, read: true } : msg
       ));
-      
-      // Handle conversation updates
-      if (selectedConversation.isNew) {
-        const newConversation = {
-          ...selectedConversation,
-          lastMessage: {
-            content: sentMessage.content,
-            timestamp: new Date(sentMessage.created_date),
-            sender: sentMessage.sender_id,
-            read: false
-          },
-          isNew: false
-        };
-        
-        setConversations(prev => [newConversation, ...prev]);
-        setSelectedConversation(newConversation);
-      } else {
-        setConversations(prev => prev.map(conv => 
-          conv.id === selectedConversation.participant.id 
-            ? { 
-                ...conv, 
-                lastMessage: {
-                  content: sentMessage.content,
-                  timestamp: new Date(sentMessage.created_date),
-                  sender: sentMessage.sender_id,
-                  read: false
-                }
-              }
-            : conv
-        ));
-      }
-
-      setConnectionError(false);
-      setRetryCount(0);
     } catch (error) {
-      console.error('Error sending message:', error);
-      
-      // Mark message as failed
-      setMessages(prev => prev.map(msg => 
-        msg.id === optimisticMessage.id 
-          ? { ...msg, sending: false, failed: true, error: 'Failed to send. Tap to retry.' }
-          : msg
-      ));
-      
-      // Restore input
-      setNewMessage(messageContent);
-      
-      handleApiError(error, 'Sending message');
-    } finally {
-      setSending(false);
-      // Restore focus to input
-      setTimeout(() => {
-        if (inputRef.current) {
-          inputRef.current.focus();
-        }
-      }, 100);
+      console.error('Failed to mark message as read:', error);
+      // Don't show error to user since this is not critical
     }
   };
+
+  // Enhanced sendMessage with retry logic
+  // Replace your sendMessage function in Messages.jsx with this enhanced version:
+
+const sendMessage = async (e) => {
+  e.preventDefault();
+  if (!newMessage.trim() || !selectedConversation || sending) return;
+
+  const messageContent = newMessage.trim();
+  setSending(true);
+  
+  // Clear input immediately
+  setNewMessage('');
+  
+  // Add optimistic message
+  const optimisticMessage = {
+    id: `temp-${Date.now()}`,
+    sender_id: user.id,
+    recipient_id: selectedConversation.participant.id,
+    content: messageContent,
+    created_date: new Date().toISOString(),
+    read: false,
+    listing_id: selectedConversation.listing?.id || null,
+    sending: true,
+    failed: false
+  };
+
+  setMessages(prev => [...prev, optimisticMessage]);
+
+  const messageData = {
+    recipient_id: selectedConversation.participant.id,
+    content: messageContent,
+    listing_id: selectedConversation.listing?.id || null
+  };
+
+  try {
+    // REFRESH USER AUTH BEFORE SENDING MESSAGE
+    console.log('Refreshing auth before sending message...');
+    await apiClient.getCurrentUser();
+    console.log('Auth refreshed successfully');
+    
+    const sentMessage = await apiClient.sendMessage(messageData);
+    
+    // Replace optimistic message with real message
+    setMessages(prev => prev.map(msg => 
+      msg.id === optimisticMessage.id ? sentMessage : msg
+    ));
+    
+    // Handle conversation updates
+    if (selectedConversation.isNew) {
+      const newConversation = {
+        ...selectedConversation,
+        lastMessage: {
+          content: sentMessage.content,
+          timestamp: new Date(sentMessage.created_date),
+          sender: sentMessage.sender_id,
+          read: false
+        },
+        isNew: false
+      };
+      
+      setConversations(prev => [newConversation, ...prev]);
+      setSelectedConversation(newConversation);
+    } else {
+      setConversations(prev => prev.map(conv => 
+        conv.id === selectedConversation.participant.id 
+          ? { 
+              ...conv, 
+              lastMessage: {
+                content: sentMessage.content,
+                timestamp: new Date(sentMessage.created_date),
+                sender: sentMessage.sender_id,
+                read: false
+              }
+            }
+          : conv
+      ));
+    }
+
+    setConnectionError(false);
+    setRetryCount(0);
+    toast.success('Message sent successfully');
+  } catch (error) {
+    console.error('Error sending message:', error);
+    console.log('Error details:', {
+      message: error.message,
+      status: error.status,
+      data: error.data
+    });
+    
+    // Mark message as failed
+    setMessages(prev => prev.map(msg => 
+      msg.id === optimisticMessage.id 
+        ? { ...msg, sending: false, failed: true, error: 'Failed to send. Tap to retry.' }
+        : msg
+    ));
+    
+    // Restore input
+    setNewMessage(messageContent);
+    
+    // Handle specific auth errors
+    if (error.status === 401) {
+      toast.error('Session expired. Please refresh the page and try again.');
+      // Optionally redirect to login or refresh auth
+    } else {
+      handleApiError(error, 'Sending message');
+    }
+  } finally {
+    setSending(false);
+    // Restore focus to input
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, 100);
+  }
+};
 
   // Retry failed message
   const retryMessage = async (failedMessage) => {
@@ -578,6 +632,7 @@ const Messages = () => {
       </div>
     );
   };
+
 const MessageBubble = ({ message, isOwn }) => {
   const isSending = message.sending;
   const isFailed = message.failed;
