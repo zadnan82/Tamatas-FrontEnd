@@ -1,24 +1,20 @@
-// Temporary debug version - replace your CreateListing.jsx with this to debug the issue
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '../components/ui/Toast';
 import Button from '../Components/ui/Button';
 import Input from '../components/ui/Input';
 import Textarea from '../components/ui/Textarea';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/Card';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { apiClient } from '../config/api';
 import { CATEGORIES, PRICE_UNITS, TRADE_PREFERENCES } from '../utils/constants';
-import { ArrowLeft, Save, Upload, X, DollarSign, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Upload, X, DollarSign } from 'lucide-react';
+import ImageUploader from '../Components/shared/ImageUploader';
 
 const CreateListing = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
   const listingToEdit = location.state?.listing;
-
-  // Debug: Log the backend URL
-  console.log('Backend URL:', apiClient.baseURL);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -36,29 +32,13 @@ const CreateListing = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Test backend connection
-  const testBackendConnection = async () => {
-    try {
-      console.log('Testing backend connection...');
-      const response = await fetch(`${apiClient.baseURL}/health`);
-      console.log('Health check response:', response.status, response.statusText);
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Health check data:', data);
-      }
-    } catch (error) {
-      console.error('Backend connection test failed:', error);
-    }
-  };
-
   useEffect(() => {
-    testBackendConnection();
-    
     if (listingToEdit) {
       setFormData({
         ...listingToEdit,
         price: listingToEdit.price || '',
-        harvest_date: listingToEdit.harvest_date ? listingToEdit.harvest_date.split('T')[0] : '',
+        harvest_date: listingToEdit.harvest_date ? 
+          listingToEdit.harvest_date.split('T')[0] : '', // Convert back to date format for input
         location: {
           city: listingToEdit.location?.city || '',
           state: listingToEdit.location?.state || ''
@@ -70,7 +50,6 @@ const CreateListing = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    console.log('Form field changed:', { name, value, type, checked });
     
     if (name.includes('.')) {
       const [parent, child] = name.split('.');
@@ -86,36 +65,12 @@ const CreateListing = () => {
     }
   };
 
-  // Mock image upload for testing
-  const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files);
-    console.log('Files selected:', files.length);
-    
-    // For debugging, just add mock URLs
-    const mockUrls = files.map((file, index) => 
-      `https://res.cloudinary.com/dr2knxtuq/image/upload/v1234567890/tamatas/listings/test_${index}.jpg`
-    );
-    
-    setFormData(prev => ({
-      ...prev,
-      images: [...prev.images, ...mockUrls]
-    }));
-    
-    toast.success(`Added ${files.length} mock image(s) for testing`);
-  };
-
-  const removeImage = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index)
-    }));
+  const handleImagesChange = (images) => {
+    setFormData(prev => ({ ...prev, images }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    console.log('=== FORM SUBMISSION DEBUG ===');
-    console.log('Raw form data:', formData);
     
     // Validation
     if (formData.images.length === 0) {
@@ -131,94 +86,20 @@ const CreateListing = () => {
     setIsSubmitting(true);
     
     try {
-      // Clean up the data before sending - EXACTLY match your Pydantic model
-      const dataToSave = {
-        title: formData.title.trim(),
-        description: formData.description?.trim() || '',
-        category: formData.category,
-        subcategory: formData.subcategory || '',
-        listing_type: formData.listing_type,
-        price: formData.price ? parseFloat(formData.price) : null,
-        price_unit: formData.price_unit || 'per_lb',
-        quantity_available: formData.quantity_available?.trim() || '',
-        trade_preference: formData.trade_preference || 'both',
-        images: formData.images,
-        status: 'active',
-        harvest_date: formData.harvest_date || null,
-        organic: Boolean(formData.organic),
-        location: {
-          city: formData.location?.city?.trim() || '',
-          state: formData.location?.state?.trim() || '',
-          latitude: null,
-          longitude: null
-        },
-        view_count: 0
-      };
-
-      console.log('=== CLEANED DATA TO SEND ===');
-      console.log(JSON.stringify(dataToSave, null, 2));
-      
-      // Validate the data structure
-      console.log('=== DATA VALIDATION ===');
-      console.log('Title type:', typeof dataToSave.title, 'Value:', dataToSave.title);
-      console.log('Description type:', typeof dataToSave.description, 'Value:', dataToSave.description);
-      console.log('Category type:', typeof dataToSave.category, 'Value:', dataToSave.category);
-      console.log('Listing type:', typeof dataToSave.listing_type, 'Value:', dataToSave.listing_type);
-      console.log('Price type:', typeof dataToSave.price, 'Value:', dataToSave.price);
-      console.log('Price unit type:', typeof dataToSave.price_unit, 'Value:', dataToSave.price_unit);
-      console.log('Images type:', typeof dataToSave.images, 'Length:', dataToSave.images.length);
-      console.log('Organic type:', typeof dataToSave.organic, 'Value:', dataToSave.organic);
-      console.log('Location type:', typeof dataToSave.location, 'Value:', dataToSave.location);
-      
-      // Test with a minimal payload first
-      const minimalData = {
-        title: formData.title.trim(),
-        category: formData.category,
-        listing_type: formData.listing_type,
-        images: formData.images
-      };
-      
-      console.log('=== TESTING WITH MINIMAL DATA ===');
-      console.log(JSON.stringify(minimalData, null, 2));
-
       if (listingToEdit) {
-        await apiClient.updateListing(listingToEdit.id, dataToSave);
+        await apiClient.updateListing(listingToEdit.id, formData);
         toast.success('Listing updated successfully!');
       } else {
-        console.log('=== CALLING CREATE LISTING ===');
-        const result = await apiClient.createListing(dataToSave);
-        console.log('=== LISTING CREATION SUCCESS ===');
-        console.log('Result:', result);
+        const result = await apiClient.createListing(formData);
         toast.success('Listing created successfully!');
       }
       navigate('/dashboard');
     } catch (error) {
-      console.error('=== ERROR DETAILS ===');
-      console.error('Error object:', error);
-      console.error('Error type:', typeof error);
-      console.error('Error constructor:', error.constructor.name);
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
+      console.error('Error saving listing:', error);
       
-      if (error.data) {
-        console.error('Error data:', error.data);
-      }
-      
-      if (error.status) {
-        console.error('HTTP status:', error.status);
-      }
-      
-      // Better error handling
       let errorMessage = 'Failed to save listing. Please try again.';
-      
       if (error.message && error.message !== '[object Object]') {
         errorMessage = error.message;
-      } else if (error.data) {
-        try {
-          errorMessage = JSON.stringify(error.data, null, 2);
-        } catch {
-          errorMessage = 'Backend validation error - check console for details';
-        }
       }
       
       toast.error(errorMessage);
@@ -238,9 +119,9 @@ const CreateListing = () => {
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              {listingToEdit ? 'Edit Listing' : 'Create New Listing (DEBUG MODE)'}
+              {listingToEdit ? 'Edit Listing' : 'Create New Listing'}
             </h1>
-            <p className="text-gray-600">Debug version with detailed logging</p>
+            <p className="text-gray-600">Share your fresh produce with the community</p>
           </div>
         </div>
 
@@ -301,44 +182,15 @@ const CreateListing = () => {
                 </div>
               </div>
 
-              {/* Images Section - Simplified for debugging */}
+              {/* Images Section */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Images (Required) - Mock Upload for Testing</h3>
-                
-                <div className="grid grid-cols-3 gap-4">
-                  {formData.images.map((image, index) => (
-                    <div key={index} className="relative group">
-                      <div className="w-full h-32 bg-gray-200 rounded-lg flex items-center justify-center">
-                        <span className="text-sm">Mock Image {index + 1}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeImage(index)}
-                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                  
-                  {formData.images.length < 3 && (
-                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
-                      <Upload className="w-6 h-6 text-gray-400" />
-                      <span className="mt-1 text-sm text-gray-500">Add Mock Image</span>
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleImageUpload}
-                      />
-                    </label>
-                  )}
-                </div>
-                
-                {formData.images.length === 0 && (
-                  <p className="text-sm text-red-500">At least one image is required.</p>
-                )}
+                <h3 className="text-lg font-semibold">Images (Required)</h3>
+                <ImageUploader
+                  existingImages={formData.images}
+                  onImagesChange={handleImagesChange}
+                  maxImages={3}
+                  disabled={isSubmitting}
+                />
               </div>
 
               {/* Pricing (only for for_sale) */}
@@ -453,14 +305,6 @@ const CreateListing = () => {
                     />
                   </div>
                 </div>
-              </div>
-
-              {/* Debug Info */}
-              <div className="bg-gray-100 p-4 rounded-lg">
-                <h4 className="font-semibold mb-2">Debug Info:</h4>
-                <pre className="text-xs bg-white p-2 rounded overflow-auto max-h-40">
-                  {JSON.stringify(formData, null, 2)}
-                </pre>
               </div>
 
               <div className="flex justify-end gap-4">

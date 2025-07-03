@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ui/Toast';
-import Button from '../components/ui/button';
+import Button from '../Components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card, CardContent, FeatureCard, StatsCard } from '../components/ui/Card';
 import { 
