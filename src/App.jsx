@@ -30,9 +30,10 @@ const AppContent = () => {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-pink-50">
         <div className="text-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 via-red-400 to-pink-400 flex items-center justify-center shadow-lg mb-4 mx-auto animate-pulse">
-            <span className="text-2xl">🍅</span>
-          </div>
+          <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center shadow-lg mb-4 mx-auto animate-pulse">
+  <img src="/logo.png" alt="Tamatas Logo" className="w-full h-full object-cover" />
+</div>
+
           <div className="loading-spinner mx-auto mb-4"></div>
           <h2 className="text-xl font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent mb-2">
             Tamatas

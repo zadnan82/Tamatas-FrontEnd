@@ -29,89 +29,48 @@ const Dashboard = () => {
     try {
       setLoading(true);
       
-      // Mock data for demo
-      const mockListings = [
-        {
-          id: 1,
-          title: 'Fresh Organic Tomatoes',
-          description: 'Vine-ripened heirloom tomatoes from our organic farm.',
-          category: 'tomatoes_peppers',
-          listing_type: 'for_sale',
-          price: 4.50,
-          price_unit: 'per_lb',
-          images: ['https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=300'],
-          status: 'active',
-          view_count: 45,
-          favorites_count: 12,
-          created_date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString()
-        },
-        {
-          id: 2,
-          title: 'Fresh Basil Leaves',
-          description: 'Aromatic sweet basil, perfect for pesto.',
-          category: 'herbs',
-          listing_type: 'for_sale',
-          price: 3.00,
-          price_unit: 'per_bag',
-          images: ['https://images.unsplash.com/photo-1618375569909-3c8616cf5ecf?w=300'],
-          status: 'active',
-          view_count: 23,
-          favorites_count: 8,
-          created_date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString()
-        }
-      ];
+      // Load real data from API
+      const [listings, feeds, messages] = await Promise.all([
+        apiClient.getMyListings(),
+        apiClient.getFeeds(),
+        apiClient.getMessages().catch(() => []) // Handle if messages fail
+      ]);
       
-      setMyListings(mockListings);
+      setMyListings(listings || []);
       
-      // Calculate stats
-      const activeListings = mockListings.filter(l => l.status === 'active');
-      const totalViews = mockListings.reduce((sum, listing) => sum + (listing.view_count || 0), 0);
+      // Calculate real stats from API data
+      const activeListings = listings.filter(l => l.status === 'active');
+      const totalViews = listings.reduce((sum, listing) => sum + (listing.view_count || 0), 0);
+      const unreadMessages = messages.filter(m => !m.read && m.recipient_id === user.id).length;
       
       setStats({
-        totalListings: mockListings.length,
+        totalListings: listings.length,
         activeListings: activeListings.length,
-        messages: 3,
-        rating: 4.8,
+        messages: unreadMessages,
+        rating: 4.8, // TODO: Calculate from reviews when implemented
         totalViews: totalViews,
-        totalRevenue: 127.50,
-        completedTrades: 5
+        totalRevenue: 0, // TODO: Calculate from completed trades
+        completedTrades: listings.filter(l => l.status === 'completed').length
       });
       
-      // Mock recent activity
-      const mockActivity = [
-        {
-          id: 1,
-          type: 'new_listing',
-          title: 'New listing posted',
-          content: 'Fresh Organic Tomatoes',
-          user: { name: 'John Farmer', location: 'Springfield, IL' },
-          timestamp: new Date(Date.now() - 1000 * 60 * 30),
-          icon: '🛍️',
-          color: 'from-orange-400 to-red-400'
+      // Transform recent feeds into activity format
+      const feedActivity = feeds.slice(0, 5).map(listing => ({
+        id: listing.id,
+        type: 'new_listing',
+        title: 'New listing posted',
+        content: listing.title,
+        user: {
+          name: listing.owner?.full_name || 'Anonymous User',
+          location: listing.location ? `${listing.location.city}, ${listing.location.state}` : 'Unknown location'
         },
-        {
-          id: 2,
-          type: 'trade_completed',
-          title: 'Trade completed',
-          content: 'Successfully traded basil for mint',
-          user: { name: 'Jane Gardener', location: 'Madison, WI' },
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-          icon: '💚',
-          color: 'from-green-400 to-emerald-400'
-        },
-        {
-          id: 3,
-          type: 'new_message',
-          title: 'New message',
-          content: 'Question about tomato availability',
-          user: { name: 'Chef Mike', location: 'Chicago, IL' },
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4),
-          icon: '💬',
-          color: 'from-blue-400 to-cyan-400'
-        }
-      ];
+        timestamp: new Date(listing.created_date),
+        icon: listing.listing_type === 'for_sale' ? '🛍️' : '🔍',
+        color: listing.listing_type === 'for_sale' 
+          ? 'from-green-400 to-emerald-400'
+          : 'from-blue-400 to-cyan-400'
+      }));
       
-      setRecentActivity(mockActivity);
+      setRecentActivity(feedActivity);
       
     } catch (error) {
       console.error('Error loading dashboard:', error);
@@ -124,8 +83,10 @@ const Dashboard = () => {
   const handleDelete = async (listingId) => {
     if (window.confirm('Are you sure you want to delete this listing?')) {
       try {
+        await apiClient.deleteListing(listingId);
         setMyListings(prev => prev.filter(l => l.id !== listingId));
         toast.success('Listing deleted successfully');
+        // Reload stats
         loadDashboardData();
       } catch (error) {
         console.error('Delete failed:', error);
@@ -246,7 +207,7 @@ const Dashboard = () => {
             </div>
             <div className="flex items-center gap-1">
               <span className="text-sm">❤️</span>
-              <span className="font-semibold">{listing.favorites_count || 0} likes</span>
+              <span className="font-semibold">0 likes</span>
             </div>
           </div>
         </div>
@@ -305,7 +266,7 @@ const Dashboard = () => {
           icon="👁️"
           title="Total Views"
           value={stats.totalViews.toLocaleString()}
-          subtitle="This month"
+          subtitle="All time"
           trend={8}
           gradient="from-blue-400 to-cyan-500"
         />
@@ -313,7 +274,7 @@ const Dashboard = () => {
           icon="💰"
           title="Completed"
           value={stats.completedTrades}
-          subtitle="This month"
+          subtitle="Trades"
           trend={15}
           gradient="from-orange-400 to-pink-400"
         />

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { apiClient } from '../../config/api';
 import { 
   Home, 
   ShoppingBag, 
@@ -27,9 +28,10 @@ const TamatasLogo = ({ size = 'md' }) => {
   };
 
   return (
-    <div className={`${sizes[size]} rounded-xl bg-gradient-to-br from-orange-400 via-red-400 to-pink-400 flex items-center justify-center shadow-lg`}>
-      <span className="text-white font-bold text-sm">🍅</span>
-    </div>
+    <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center shadow-lg mb-4 mx-auto animate-pulse">
+  <img src="/logo.png" alt="Tamatas Logo" className="w-full h-full object-cover" />
+</div>
+
   );
 };
 
@@ -37,7 +39,23 @@ const Navigation = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
+  const [unreadCount, setUnreadCount] = useState(0);
+
+useEffect(() => {
+  const fetchUnreadCount = async () => {
+    try {
+      const messages = await apiClient.getMessages();
+      const unreadMessages = messages.filter(m => !m.read); // or m.is_read === false
+      setUnreadCount(unreadMessages.length);
+    } catch (error) {
+      console.error('Failed to fetch unread messages:', error);
+      setUnreadCount(0);
+    }
+  };
+
+  fetchUnreadCount();
+}, []);
+
   const menuItems = [
     { 
       name: 'Dashboard', 
@@ -69,7 +87,7 @@ const Navigation = () => {
       icon: MessageSquare, 
       path: '/messages',
       color: 'from-cyan-400 to-blue-400',
-      count: 3
+      count: unreadCount > 0 ? unreadCount : null
     },
     { 
       name: 'Forum', 

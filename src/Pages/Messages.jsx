@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ui/Toast';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { apiClient } from '../config/api';
 import { 
   Send, 
   Search, 
@@ -17,7 +17,8 @@ import {
   MapPin,
   ShoppingBag,
   Clock,
-  Star
+  Star,
+  MessageSquare
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 
@@ -38,7 +39,7 @@ const Messages = () => {
 
   useEffect(() => {
     if (selectedConversation) {
-      loadMessages(selectedConversation.id);
+      loadMessages(selectedConversation.participant.id);
     }
   }, [selectedConversation]);
 
@@ -48,140 +49,107 @@ const Messages = () => {
 
   const loadConversations = async () => {
     try {
-      // Mock conversations data
-      const mockConversations = [
-        {
-          id: 1,
-          participant: {
-            id: 2,
-            name: 'Jane Gardener',
-            avatar: '/placeholder-avatar.jpg',
-            location: 'Madison, WI',
-            online: true,
-            lastSeen: new Date()
-          },
-          lastMessage: {
-            content: "Hi! Are the tomatoes still available?",
-            timestamp: new Date(Date.now() - 1000 * 60 * 15),
-            sender: 2,
-            read: false
-          },
-          unreadCount: 2,
-          listing: {
-            id: 1,
-            title: 'Fresh Organic Tomatoes',
-            image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=100'
+      setLoading(true);
+      // Get all messages to build conversation list
+      const messagesData = await apiClient.getMessages();
+      
+      // Process messages into conversations
+      const conversationsMap = new Map();
+      
+      messagesData.forEach(message => {
+        const isFromCurrentUser = message.sender_id === user.id;
+        const participantId = isFromCurrentUser ? message.recipient_id : message.sender_id;
+        const participant = isFromCurrentUser ? message.recipient : message.sender;
+        
+        if (!conversationsMap.has(participantId)) {
+          conversationsMap.set(participantId, {
+            id: participantId,
+            participant: {
+              id: participantId,
+              name: participant?.full_name || participant?.email || 'Unknown User',
+              avatar: participant?.profile_image,
+              location: participant?.address || 'Unknown location',
+              online: false,
+              lastSeen: new Date()
+            },
+            lastMessage: {
+              content: message.content,
+              timestamp: new Date(message.created_date),
+              sender: message.sender_id,
+              read: message.read
+            },
+            unreadCount: message.recipient_id === user.id && !message.read ? 1 : 0,
+            listing: message.listing ? {
+              id: message.listing.id,
+              title: message.listing.title,
+              image: message.listing.images?.[0]?.url
+            } : null
+          });
+        } else {
+          const conversation = conversationsMap.get(participantId);
+          
+          // Update last message if newer
+          if (new Date(message.created_date) > conversation.lastMessage.timestamp) {
+            conversation.lastMessage = {
+              content: message.content,
+              timestamp: new Date(message.created_date),
+              sender: message.sender_id,
+              read: message.read
+            };
           }
-        },
-        {
-          id: 2,
-          participant: {
-            id: 3,
-            name: 'Chef Mike',
-            avatar: '/placeholder-avatar.jpg',
-            location: 'Chicago, IL',
-            online: false,
-            lastSeen: new Date(Date.now() - 1000 * 60 * 60 * 2)
-          },
-          lastMessage: {
-            content: "Thanks for the great strawberries!",
-            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3),
-            sender: 1,
-            read: true
-          },
-          unreadCount: 0,
-          rating: 5
-        },
-        {
-          id: 3,
-          participant: {
-            id: 4,
-            name: 'Sarah Green',
-            avatar: '/placeholder-avatar.jpg',
-            location: 'Portland, OR',
-            online: true,
-            lastSeen: new Date()
-          },
-          lastMessage: {
-            content: "When would be a good time to pick up the herbs?",
-            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 6),
-            sender: 4,
-            read: true
-          },
-          unreadCount: 0,
-          listing: {
-            id: 3,
-            title: 'Fresh Basil & Herbs',
-            image: 'https://images.unsplash.com/photo-1618375569909-3c8616cf5ecf?w=100'
+          
+          // Update unread count
+          if (message.recipient_id === user.id && !message.read) {
+            conversation.unreadCount += 1;
           }
         }
-      ];
+      });
       
-      setConversations(mockConversations);
-      if (mockConversations.length > 0) {
-        setSelectedConversation(mockConversations[0]);
+      const conversationsArray = Array.from(conversationsMap.values())
+        .sort((a, b) => b.lastMessage.timestamp - a.lastMessage.timestamp);
+      
+      setConversations(conversationsArray);
+      
+      // Select first conversation if available
+      if (conversationsArray.length > 0) {
+        setSelectedConversation(conversationsArray[0]);
       }
-    } catch (error) {
-      console.error('Error loading conversations:', error);
-      toast.error('Failed to load conversations');
-    } finally {
-      setLoading(false);
-    }
-  };
+     } catch (error) {
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      response: error.response
+    });
+    toast.error(error.message || 'Failed to load conversations');
+    setConversations([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const loadMessages = async (conversationId) => {
+  const loadMessages = async (participantId) => {
     try {
-      // Mock messages data
-      const mockMessages = [
-        {
-          id: 1,
-          conversationId: 1,
-          sender: 2,
-          content: "Hi! I saw your listing for organic tomatoes. Are they still available?",
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-          read: true,
-          type: 'text'
-        },
-        {
-          id: 2,
-          conversationId: 1,
-          sender: 1,
-          content: "Yes, they are! I have about 15 lbs left. They're vine-ripened and completely organic.",
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2 + 1000 * 60 * 5),
-          read: true,
-          type: 'text'
-        },
-        {
-          id: 3,
-          conversationId: 1,
-          sender: 2,
-          content: "Perfect! What's your price per lb? And when would be good for pickup?",
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 1),
-          read: true,
-          type: 'text'
-        },
-        {
-          id: 4,
-          conversationId: 1,
-          sender: 1,
-          content: "$4.50 per lb. I'm usually available afternoons after 3 PM. Tomorrow work for you?",
-          timestamp: new Date(Date.now() - 1000 * 60 * 30),
-          read: true,
-          type: 'text'
-        },
-        {
-          id: 5,
-          conversationId: 1,
-          sender: 2,
-          content: "Hi! Are the tomatoes still available?",
-          timestamp: new Date(Date.now() - 1000 * 60 * 15),
-          read: false,
-          type: 'text'
-        }
-      ];
+      const conversationMessages = await apiClient.getConversation(participantId);
       
-      const conversationMessages = mockMessages.filter(m => m.conversationId === conversationId);
-      setMessages(conversationMessages);
+      // Mark messages as read when loading the conversation
+      const unreadMessages = conversationMessages.filter(
+        msg => msg.recipient_id === user.id && !msg.read
+      );
+      
+      if (unreadMessages.length > 0) {
+        await Promise.all(
+          unreadMessages.map(msg => apiClient.markMessageRead(msg.id))
+        );
+        
+        // Update conversation unread count
+        setConversations(prev => prev.map(conv => 
+          conv.id === participantId ? { ...conv, unreadCount: 0 } : conv
+        ));
+      }
+      
+      setMessages(conversationMessages.sort((a, b) => 
+        new Date(a.created_date) - new Date(b.created_date)
+      ));
     } catch (error) {
       console.error('Error loading messages:', error);
       toast.error('Failed to load messages');
@@ -192,45 +160,42 @@ const Messages = () => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation) return;
 
-    const message = {
-      id: Date.now(),
-      conversationId: selectedConversation.id,
-      sender: user.id || 1,
-      content: newMessage.trim(),
-      timestamp: new Date(),
-      read: false,
-      type: 'text'
-    };
+    try {
+      const messageData = {
+        recipient_id: selectedConversation.participant.id,
+        content: newMessage.trim()
+      };
 
-    setMessages(prev => [...prev, message]);
-    setNewMessage('');
-    
-    // Update last message in conversation
-    setConversations(prev => prev.map(conv => 
-      conv.id === selectedConversation.id 
-        ? { 
-            ...conv, 
-            lastMessage: {
-              content: message.content,
-              timestamp: message.timestamp,
-              sender: message.sender,
-              read: false
+      const sentMessage = await apiClient.sendMessage(messageData);
+      
+      // Update messages list
+      setMessages(prev => [...prev, sentMessage]);
+      setNewMessage('');
+      
+      // Update conversation list
+      setConversations(prev => prev.map(conv => 
+        conv.id === selectedConversation.participant.id 
+          ? { 
+              ...conv, 
+              lastMessage: {
+                content: sentMessage.content,
+                timestamp: new Date(sentMessage.created_date),
+                sender: sentMessage.sender_id,
+                read: false
+              }
             }
-          }
-        : conv
-    ));
+          : conv
+      ));
 
-    toast.success('Message sent!');
+      toast.success('Message sent!');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast.error('Failed to send message');
+    }
   };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const markAsRead = async (conversationId) => {
-    setConversations(prev => prev.map(conv => 
-      conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv
-    ));
   };
 
   const ConversationList = () => {
@@ -256,76 +221,87 @@ const Messages = () => {
 
         {/* Conversations */}
         <div className="flex-1 overflow-y-auto">
-          {filteredConversations.map(conversation => (
-            <button
-              key={conversation.id}
-              onClick={() => {
-                setSelectedConversation(conversation);
-                markAsRead(conversation.id);
-              }}
-              className={`w-full p-4 text-left hover:bg-white/80 transition-colors border-b border-gray-50 ${
-                selectedConversation?.id === conversation.id ? 'bg-white/80' : ''
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="w-12 h-12 clay-card rounded-2xl overflow-hidden bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center">
-                    <span className="text-white font-semibold">
-                      {conversation.participant.name.charAt(0)}
-                    </span>
-                  </div>
-                  {conversation.participant.online && (
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
-                  )}
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <h4 className="font-semibold text-sm truncate">{conversation.participant.name}</h4>
-                    <div className="flex items-center gap-1">
-                      {conversation.rating && (
-                        <div className="flex items-center gap-1">
-                          <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                          <span className="text-xs clay-text-soft">{conversation.rating}</span>
-                        </div>
+          {filteredConversations.length === 0 ? (
+            <div className="p-8 text-center">
+              <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <h3 className="font-semibold text-gray-600 mb-2">No conversations</h3>
+              <p className="text-sm text-gray-500">Start by contacting sellers from listings</p>
+            </div>
+          ) : (
+            filteredConversations.map(conversation => (
+              <button
+                key={conversation.id}
+                onClick={() => setSelectedConversation(conversation)}
+                className={`w-full p-4 text-left hover:bg-white/80 transition-colors border-b border-gray-50 ${
+                  selectedConversation?.id === conversation.id ? 'bg-white/80' : ''
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <div className="w-12 h-12 clay-card rounded-2xl overflow-hidden bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center">
+                      {conversation.participant.avatar ? (
+                        <img 
+                          src={conversation.participant.avatar} 
+                          alt={conversation.participant.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-white font-semibold">
+                          {conversation.participant.name.charAt(0)}
+                        </span>
                       )}
+                    </div>
+                    {conversation.participant.online && (
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+                    )}
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <h4 className="font-semibold text-sm truncate">{conversation.participant.name}</h4>
                       <span className="text-xs clay-text-soft">
                         {formatDistanceToNow(conversation.lastMessage.timestamp, { addSuffix: true })}
                       </span>
                     </div>
-                  </div>
-                  
-                  <p className="clay-text-soft text-xs flex items-center gap-1 mb-1">
-                    <MapPin className="w-3 h-3" />
-                    {conversation.participant.location}
-                  </p>
-                  
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm clay-text-soft truncate flex-1">
-                      {conversation.lastMessage.sender === (user.id || 1) && "You: "}
-                      {conversation.lastMessage.content}
+                    
+                    <p className="clay-text-soft text-xs flex items-center gap-1 mb-1">
+                      <MapPin className="w-3 h-3" />
+                      {conversation.participant.location}
                     </p>
-                    {conversation.unreadCount > 0 && (
-                      <div className="clay-badge clay-badge-green text-xs px-2 py-1 ml-2">
-                        {conversation.unreadCount}
+                    
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm clay-text-soft truncate flex-1">
+                        {conversation.lastMessage.sender === user.id && "You: "}
+                        {conversation.lastMessage.content}
+                      </p>
+                      {conversation.unreadCount > 0 && (
+                        <div className="clay-badge clay-badge-green text-xs px-2 py-1 ml-2">
+                          {conversation.unreadCount}
+                        </div>
+                      )}
+                    </div>
+
+                    {conversation.listing && (
+                      <div className="clay-card p-2 mt-2 bg-white/60 flex items-center gap-2">
+                        {conversation.listing.image ? (
+                          <img 
+                            src={conversation.listing.image} 
+                            alt={conversation.listing.title}
+                            className="w-8 h-8 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-lg bg-green-200 flex items-center justify-center">
+                            <ShoppingBag className="w-4 h-4 text-green-600" />
+                          </div>
+                        )}
+                        <span className="text-xs clay-text-soft truncate">{conversation.listing.title}</span>
                       </div>
                     )}
                   </div>
-
-                  {conversation.listing && (
-                    <div className="clay-card p-2 mt-2 bg-white/60 flex items-center gap-2">
-                      <img 
-                        src={conversation.listing.image} 
-                        alt={conversation.listing.title}
-                        className="w-8 h-8 rounded-lg object-cover"
-                      />
-                      <span className="text-xs clay-text-soft truncate">{conversation.listing.title}</span>
-                    </div>
-                  )}
                 </div>
-              </div>
-            </button>
-          ))}
+              </button>
+            ))
+          )}
         </div>
       </div>
     );
@@ -352,7 +328,7 @@ const Messages = () => {
           </div>
           
           <div className={`flex items-center gap-1 mt-1 text-xs clay-text-soft ${isOwn ? 'justify-end' : 'justify-start'}`}>
-            <span>{format(message.timestamp, 'HH:mm')}</span>
+            <span>{format(new Date(message.created_date), 'HH:mm')}</span>
             {isOwn && (
               <div className="flex items-center">
                 {message.read ? (
@@ -398,9 +374,17 @@ const Messages = () => {
           <div className="flex items-center gap-3">
             <div className="relative">
               <div className="w-10 h-10 clay-card rounded-2xl bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center">
-                <span className="text-white font-semibold">
-                  {selectedConversation.participant.name.charAt(0)}
-                </span>
+                {selectedConversation.participant.avatar ? (
+                  <img 
+                    src={selectedConversation.participant.avatar} 
+                    alt={selectedConversation.participant.name}
+                    className="w-full h-full object-cover rounded-2xl"
+                  />
+                ) : (
+                  <span className="text-white font-semibold">
+                    {selectedConversation.participant.name.charAt(0)}
+                  </span>
+                )}
               </div>
               {selectedConversation.participant.online && (
                 <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
@@ -440,13 +424,21 @@ const Messages = () => {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {messages.map(message => (
-            <MessageBubble 
-              key={message.id} 
-              message={message} 
-              isOwn={message.sender === (user.id || 1)}
-            />
-          ))}
+          {messages.length === 0 ? (
+            <div className="text-center py-8">
+              <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <h3 className="font-semibold text-gray-600 mb-2">No messages yet</h3>
+              <p className="text-sm text-gray-500">Start the conversation by sending a message</p>
+            </div>
+          ) : (
+            messages.map(message => (
+              <MessageBubble 
+                key={message.id} 
+                message={message} 
+                isOwn={message.sender_id === user.id}
+              />
+            ))
+          )}
           <div ref={messagesEndRef} />
         </div>
 

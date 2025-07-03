@@ -9,8 +9,8 @@ const PublicHeader = () => {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 via-red-400 to-pink-400 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-              <span className="text-xl">🍅</span>
+            <div className="w-12 h-12 rounded-2xl overflow-hidden flex items-center justify-center shadow-lg">
+              <img src="/logo.png" alt="Tamatas Logo" className="w-full h-full object-cover" />
             </div>
             <div>
               <span className="text-xl font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
@@ -19,7 +19,7 @@ const PublicHeader = () => {
               <p className="text-xs text-gray-500 font-medium">Fresh Local Exchange</p>
             </div>
           </Link>
-          
+
           {/* Navigation */}
           <nav className="hidden md:flex items-center gap-6">
             <Link 

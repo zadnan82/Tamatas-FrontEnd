@@ -123,17 +123,24 @@ const HomePage = () => {
       <section className="container mx-auto px-4 py-12">
         {/* Hero Header */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-4 mb-6">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 via-red-400 to-pink-400 flex items-center justify-center shadow-lg">
-              <span className="text-2xl">🍅</span>
-            </div>
-            <div className="text-left">
-              <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 bg-clip-text text-transparent">
-                Tamatas
-              </h1>
-              <p className="text-sm text-gray-600 font-medium">Fresh Local Exchange</p>
-            </div>
-          </div>
+         <div className="inline-flex items-center gap-4 mb-6">
+   
+  <div className="text-left">
+    <div className="flex justify-center mb-4">
+  <img 
+    src="/loggan.png" 
+    alt="Tamatas Logo" 
+    className="w-150 h-auto object-contain mx-auto" 
+  />
+</div>
+
+   <p className="text-sm text-gray-600 font-medium text-center mt-2">
+  Fresh Local Exchange
+</p>
+
+  </div>
+</div>
+
           
           <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4 max-w-4xl mx-auto leading-tight">
             Connect with Local Farmers & Fresh Produce
@@ -304,9 +311,10 @@ const HomePage = () => {
         <Card className="p-6 bg-white/60">
           <div className="text-center">
             <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-orange-400 via-red-400 to-pink-400 flex items-center justify-center">
-                <span className="text-lg">🍅</span>
-              </div>
+             <div className="w-12 h-12 rounded-2xl overflow-hidden flex items-center justify-center shadow-lg">
+  <img src="/logo.png" alt="Tamatas Logo" className="w-full h-full object-cover" />
+</div>
+
               <span className="text-lg font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
                 Tamatas
               </span>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ui/Toast';
+import { apiClient } from '../config/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import { 
@@ -22,6 +23,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { getCategoryLabel } from '../utils/constants';
 
 const Favorites = () => {
   const { user } = useAuth();
@@ -47,99 +49,9 @@ const Favorites = () => {
     try {
       setLoading(true);
       
-      // Mock favorites data
-      const mockFavorites = [
-        {
-          id: 1,
-          listing: {
-            id: 1,
-            title: 'Fresh Organic Tomatoes',
-            description: 'Vine-ripened heirloom tomatoes from our organic farm. Perfect for salads and cooking.',
-            category: 'tomatoes_peppers',
-            listing_type: 'for_sale',
-            price: 4.50,
-            price_unit: 'per_lb',
-            organic: true,
-            images: ['https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400'],
-            location: { city: 'Springfield', state: 'IL' },
-            owner: {
-              name: 'John Farmer',
-              avatar: '/placeholder-avatar.jpg',
-              rating: 4.8
-            },
-            created_date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
-            status: 'active'
-          },
-          favorited_date: new Date(Date.now() - 1000 * 60 * 60 * 24)
-        },
-        {
-          id: 2,
-          listing: {
-            id: 2,
-            title: 'Fresh Basil Leaves',
-            description: 'Aromatic sweet basil, perfect for pesto and Italian cooking.',
-            category: 'herbs',
-            listing_type: 'for_sale',
-            price: 3.00,
-            price_unit: 'per_bag',
-            organic: true,
-            images: ['https://images.unsplash.com/photo-1618375569909-3c8616cf5ecf?w=400'],
-            location: { city: 'Madison', state: 'WI' },
-            owner: {
-              name: 'Jane Gardener',
-              avatar: '/placeholder-avatar.jpg',
-              rating: 4.9
-            },
-            created_date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5),
-            status: 'active'
-          },
-          favorited_date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3)
-        },
-        {
-          id: 3,
-          listing: {
-            id: 3,
-            title: 'Looking for Fresh Strawberries',
-            description: 'Restaurant looking for 10+ lbs of fresh strawberries for our dessert menu.',
-            category: 'berries',
-            listing_type: 'looking_for',
-            location: { city: 'Chicago', state: 'IL' },
-            owner: {
-              name: 'Chef Mike',
-              avatar: '/placeholder-avatar.jpg',
-              rating: 4.7
-            },
-            created_date: new Date(Date.now() - 1000 * 60 * 60 * 24),
-            status: 'active'
-          },
-          favorited_date: new Date(Date.now() - 1000 * 60 * 60 * 12)
-        },
-        {
-          id: 4,
-          listing: {
-            id: 4,
-            title: 'Heirloom Carrots',
-            description: 'Purple and orange heirloom carrots, grown without chemicals.',
-            category: 'root_vegetables',
-            listing_type: 'for_sale',
-            price: 2.75,
-            price_unit: 'per_lb',
-            organic: false,
-            images: ['https://images.unsplash.com/photo-1445282768818-728615cc910a?w=400'],
-            location: { city: 'Portland', state: 'OR' },
-            owner: {
-              name: 'Sarah Green',
-              avatar: '/placeholder-avatar.jpg',
-              rating: 4.6
-            },
-            created_date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7),
-            status: 'sold'
-          },
-          favorited_date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 6)
-        }
-      ];
-      
-      setFavorites(mockFavorites);
+      // Load real favorites from API
+      const favoritesData = await apiClient.getFavorites();
+      setFavorites(favoritesData || []);
     } catch (error) {
       console.error('Error loading favorites:', error);
       toast.error('Failed to load favorites');
@@ -154,20 +66,20 @@ const Favorites = () => {
     // Search filter
     if (searchTerm) {
       filtered = filtered.filter(fav =>
-        fav.listing.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        fav.listing.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        fav.listing.owner.name.toLowerCase().includes(searchTerm.toLowerCase())
+        fav.listing?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        fav.listing?.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        fav.listing?.owner?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
     // Category filter
     if (categoryFilter !== 'all') {
-      filtered = filtered.filter(fav => fav.listing.category === categoryFilter);
+      filtered = filtered.filter(fav => fav.listing?.category === categoryFilter);
     }
 
     // Type filter
     if (typeFilter !== 'all') {
-      filtered = filtered.filter(fav => fav.listing.listing_type === typeFilter);
+      filtered = filtered.filter(fav => fav.listing?.listing_type === typeFilter);
     }
 
     setFilteredFavorites(filtered);
@@ -175,6 +87,7 @@ const Favorites = () => {
 
   const removeFavorite = async (favoriteId) => {
     try {
+      await apiClient.removeFromFavorites(favoriteId);
       setFavorites(prev => prev.filter(fav => fav.id !== favoriteId));
       toast.success('Removed from favorites');
     } catch (error) {
@@ -193,6 +106,11 @@ const Favorites = () => {
 
   const removeSelectedFavorites = async () => {
     try {
+      // Remove multiple favorites
+      await Promise.all(
+        selectedItems.map(favoriteId => apiClient.removeFromFavorites(favoriteId))
+      );
+      
       setFavorites(prev => prev.filter(fav => !selectedItems.includes(fav.id)));
       setSelectedItems([]);
       toast.success(`Removed ${selectedItems.length} items from favorites`);
@@ -204,7 +122,7 @@ const Favorites = () => {
 
   const shareListings = () => {
     const selectedListings = favorites.filter(fav => selectedItems.includes(fav.id));
-    const listingTitles = selectedListings.map(fav => fav.listing.title).join(', ');
+    const listingTitles = selectedListings.map(fav => fav.listing?.title || 'Untitled').join(', ');
     
     if (navigator.share) {
       navigator.share({
@@ -220,6 +138,10 @@ const Favorites = () => {
 
   const FavoriteCard = ({ favorite, compact = false }) => {
     const { listing } = favorite;
+    
+    if (!listing) {
+      return null; // Handle case where listing might be deleted
+    }
     
     if (compact) {
       return (
@@ -272,9 +194,9 @@ const Favorites = () => {
                     Organic
                   </Badge>
                 )}
-                {listing.status === 'sold' && (
+                {listing.status === 'completed' && (
                   <Badge className="clay-badge text-xs bg-gray-200 text-gray-600">
-                    Sold
+                    Completed
                   </Badge>
                 )}
               </div>
@@ -282,7 +204,10 @@ const Favorites = () => {
               <div className="flex items-center justify-between">
                 <p className="clay-text-soft text-sm flex items-center gap-1">
                   <MapPin className="w-3 h-3" />
-                  {listing.location.city}, {listing.location.state}
+                  {listing.location?.city && listing.location?.state 
+                    ? `${listing.location.city}, ${listing.location.state}`
+                    : 'Location not specified'
+                  }
                 </p>
                 <div className="flex items-center gap-2">
                   <button
@@ -356,10 +281,10 @@ const Favorites = () => {
                 </Badge>
               </div>
             )}
-            {listing.status === 'sold' && (
+            {listing.status === 'completed' && (
               <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                 <div className="clay-badge text-white bg-gray-800 px-4 py-2 text-sm font-semibold">
-                  SOLD
+                  COMPLETED
                 </div>
               </div>
             )}
@@ -388,20 +313,20 @@ const Favorites = () => {
           <div className="flex items-center gap-2 mb-4">
             <div className="w-8 h-8 clay-card rounded-xl bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center">
               <span className="text-white font-semibold text-sm">
-                {listing.owner.name.charAt(0)}
+                {listing.owner?.full_name?.charAt(0) || 'U'}
               </span>
             </div>
             <div>
-              <p className="font-medium text-sm">{listing.owner.name}</p>
+              <p className="font-medium text-sm">{listing.owner?.full_name || 'Anonymous User'}</p>
               <div className="flex items-center gap-1">
                 <div className="flex">
                   {[...Array(5)].map((_, i) => (
-                    <span key={i} className={`text-xs ${i < Math.floor(listing.owner.rating) ? 'text-yellow-400' : 'text-gray-300'}`}>
+                    <span key={i} className={`text-xs ${i < 4 ? 'text-yellow-400' : 'text-gray-300'}`}>
                       ★
                     </span>
                   ))}
                 </div>
-                <span className="clay-text-soft text-xs">({listing.owner.rating})</span>
+                <span className="clay-text-soft text-xs">(4.0)</span>
               </div>
             </div>
           </div>
@@ -410,11 +335,16 @@ const Favorites = () => {
             <div className="flex items-center justify-between text-sm clay-text-soft mb-3">
               <div className="flex items-center gap-1">
                 <MapPin className="w-4 h-4" />
-                <span>{listing.location.city}, {listing.location.state}</span>
+                <span>
+                  {listing.location?.city && listing.location?.state 
+                    ? `${listing.location.city}, ${listing.location.state}`
+                    : 'Location not specified'
+                  }
+                </span>
               </div>
               <div className="flex items-center gap-1">
                 <Heart className="w-4 h-4 text-red-500" />
-                <span>{formatDistanceToNow(favorite.favorited_date, { addSuffix: true })}</span>
+                <span>{formatDistanceToNow(new Date(favorite.created_date), { addSuffix: true })}</span>
               </div>
             </div>
             
@@ -595,25 +525,25 @@ const Favorites = () => {
           <div className="clay-grid clay-grid-4">
             <div className="text-center">
               <div className="clay-text-title text-2xl font-bold text-green-600">
-                {favorites.filter(f => f.listing.listing_type === 'for_sale').length}
+                {favorites.filter(f => f.listing?.listing_type === 'for_sale').length}
               </div>
               <div className="clay-text-soft text-sm">For Sale</div>
             </div>
             <div className="text-center">
               <div className="clay-text-title text-2xl font-bold text-blue-600">
-                {favorites.filter(f => f.listing.listing_type === 'looking_for').length}
+                {favorites.filter(f => f.listing?.listing_type === 'looking_for').length}
               </div>
               <div className="clay-text-soft text-sm">Looking For</div>
             </div>
             <div className="text-center">
               <div className="clay-text-title text-2xl font-bold text-emerald-600">
-                {favorites.filter(f => f.listing.organic).length}
+                {favorites.filter(f => f.listing?.organic).length}
               </div>
               <div className="clay-text-soft text-sm">Organic</div>
             </div>
             <div className="text-center">
               <div className="clay-text-title text-2xl font-bold text-gray-600">
-                {favorites.filter(f => f.listing.status === 'active').length}
+                {favorites.filter(f => f.listing?.status === 'active').length}
               </div>
               <div className="clay-text-soft text-sm">Still Available</div>
             </div>

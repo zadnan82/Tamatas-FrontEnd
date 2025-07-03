@@ -2,21 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ui/Toast';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { apiClient } from '../config/api';
 import { 
   MessageSquare, 
   Plus, 
   Search, 
-  Filter, 
   TrendingUp, 
-  Clock, 
   User, 
   Eye, 
   Pin, 
   Lock,
   Heart,
   MessageCircle,
-  ArrowRight,
   Leaf,
   Lightbulb,
   Users,
@@ -43,21 +40,21 @@ const Forum = () => {
     try {
       setLoading(true);
       
-      // Mock categories
-      const mockCategories = [
+      // Load categories (these are fixed in the UI for now)
+      const fixedCategories = [
         { 
           id: 'all', 
           name: 'All Discussions', 
           icon: MessageSquare, 
           color: 'from-gray-400 to-gray-500',
-          count: 156 
+          count: 0 
         },
         { 
           id: 'gardening_tips', 
           name: 'Gardening Tips', 
           icon: Leaf, 
           color: 'from-green-400 to-emerald-500',
-          count: 45,
+          count: 0,
           description: 'Share and learn gardening techniques'
         },
         { 
@@ -65,7 +62,7 @@ const Forum = () => {
           name: 'Trading Ideas', 
           icon: TrendingUp, 
           color: 'from-blue-400 to-cyan-500',
-          count: 32,
+          count: 0,
           description: 'Discuss trading strategies and opportunities'
         },
         { 
@@ -73,7 +70,7 @@ const Forum = () => {
           name: 'General Discussion', 
           icon: Users, 
           color: 'from-purple-400 to-violet-500',
-          count: 67,
+          count: 0,
           description: 'Community chat and general topics'
         },
         { 
@@ -81,148 +78,56 @@ const Forum = () => {
           name: 'Site Feedback', 
           icon: HelpCircle, 
           color: 'from-orange-400 to-red-500',
-          count: 12,
+          count: 0,
           description: 'Suggestions and platform feedback'
         }
       ];
-      
-      // Mock topics
-      const mockTopics = [
-        {
-          id: 1,
-          title: 'Best practices for organic tomato growing',
-          content: 'Looking for advice on growing organic tomatoes in small spaces...',
-          category: 'gardening_tips',
-          author: {
-            id: 1,
-            name: 'John Farmer',
-            avatar: '/placeholder-avatar.jpg',
-            reputation: 245
-          },
-          isPinned: true,
-          isLocked: false,
-          replies: 23,
-          views: 156,
-          likes: 34,
-          lastActivity: new Date(Date.now() - 1000 * 60 * 30),
-          lastReply: {
-            author: 'Sarah Green',
-            timestamp: new Date(Date.now() - 1000 * 60 * 30)
-          },
-          tags: ['organic', 'tomatoes', 'small-space']
-        },
-        {
-          id: 2,
-          title: 'Trading surplus vegetables - coordination thread',
-          content: 'Let\'s organize a weekly trading meetup for surplus vegetables...',
-          category: 'trading_ideas',
-          author: {
-            id: 2,
-            name: 'Jane Gardener',
-            avatar: '/placeholder-avatar.jpg',
-            reputation: 189
-          },
-          isPinned: false,
-          isLocked: false,
-          replies: 45,
-          views: 234,
-          likes: 67,
-          lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 2),
-          lastReply: {
-            author: 'Chef Mike',
-            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2)
-          },
-          tags: ['trading', 'meetup', 'vegetables']
-        },
-        {
-          id: 3,
-          title: 'Welcome new members! Introduce yourself here',
-          content: 'This is the place for new community members to introduce themselves...',
-          category: 'general_discussion',
-          author: {
-            id: 3,
-            name: 'Community Manager',
-            avatar: '/placeholder-avatar.jpg',
-            reputation: 500,
-            isModerator: true
-          },
-          isPinned: true,
-          isLocked: false,
-          replies: 89,
-          views: 445,
-          likes: 123,
-          lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 4),
-          lastReply: {
-            author: 'New Farmer',
-            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4)
-          },
-          tags: ['welcome', 'introductions']
-        },
-        {
-          id: 4,
-          title: 'Feature request: Mobile app notifications',
-          content: 'Would love to have push notifications for new messages and trades...',
-          category: 'site_feedback',
-          author: {
-            id: 4,
-            name: 'Tech Enthusiast',
-            avatar: '/placeholder-avatar.jpg',
-            reputation: 156
-          },
-          isPinned: false,
-          isLocked: false,
-          replies: 12,
-          views: 78,
-          likes: 25,
-          lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 6),
-          lastReply: {
-            author: 'Developer',
-            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 6)
-          },
-          tags: ['feature-request', 'mobile', 'notifications']
-        },
-        {
-          id: 5,
-          title: 'Seasonal gardening calendar for beginners',
-          content: 'Creating a comprehensive guide for when to plant different crops...',
-          category: 'gardening_tips',
-          author: {
-            id: 5,
-            name: 'Master Gardener',
-            avatar: '/placeholder-avatar.jpg',
-            reputation: 378
-          },
-          isPinned: false,
-          isLocked: false,
-          replies: 56,
-          views: 289,
-          likes: 78,
-          lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 8),
-          lastReply: {
-            author: 'Beginner Grower',
-            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 8)
-          },
-          tags: ['seasonal', 'calendar', 'beginners']
-        }
-      ];
-      
-      setCategories(mockCategories);
-      
-      // Filter topics
-      let filteredTopics = mockTopics;
+
+      // Load topics from API
+      const filters = {};
       if (selectedCategory !== 'all') {
-        filteredTopics = mockTopics.filter(topic => topic.category === selectedCategory);
+        filters.category = selectedCategory;
       }
       
-      if (searchTerm) {
-        filteredTopics = filteredTopics.filter(topic =>
-          topic.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          topic.content.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-      }
+      const apiTopics = await apiClient.getForumTopics(filters);
       
+      // Update category counts
+      const updatedCategories = fixedCategories.map(cat => {
+        if (cat.id === 'all') {
+          return { ...cat, count: apiTopics.length };
+        }
+        const count = apiTopics.filter(t => t.category === cat.id).length;
+        return { ...cat, count };
+      });
+
+      // Process topics for UI
+      const processedTopics = apiTopics.map(topic => ({
+        id: topic.id,
+        title: topic.title,
+        content: topic.content || '',
+        category: topic.category,
+        author: {
+          id: topic.created_by,
+          name: topic.author?.name || 'Anonymous',
+          avatar: topic.author?.avatar || '/placeholder-avatar.jpg',
+          reputation: topic.author?.reputation || 0,
+          isModerator: topic.author?.is_moderator || false
+        },
+        isPinned: topic.is_pinned || false,
+        isLocked: topic.is_locked || false,
+        replies: topic.post_count || 0,
+        views: topic.view_count || 0,
+        likes: topic.like_count || 0,
+        lastActivity: new Date(topic.last_activity || topic.created_date),
+        lastReply: {
+          author: topic.last_reply_author?.name || 'No replies yet',
+          timestamp: new Date(topic.last_activity || topic.created_date)
+        },
+        tags: topic.tags || []
+      }));
+
       // Sort topics
-      filteredTopics.sort((a, b) => {
+      processedTopics.sort((a, b) => {
         if (a.isPinned && !b.isPinned) return -1;
         if (!a.isPinned && b.isPinned) return 1;
         
@@ -237,13 +142,33 @@ const Forum = () => {
             return new Date(b.lastActivity) - new Date(a.lastActivity);
         }
       });
-      
-      setTopics(filteredTopics);
+
+      setCategories(updatedCategories);
+      setTopics(processedTopics);
     } catch (error) {
       console.error('Error loading forum data:', error);
       toast.error('Failed to load forum data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateTopic = async (formData) => {
+    try {
+      const topicData = {
+        title: formData.title,
+        content: formData.content,
+        category: formData.category,
+        tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
+      };
+
+      await apiClient.createForumTopic(topicData);
+      toast.success('Topic created successfully!');
+      setShowCreateModal(false);
+      loadForumData(); // Refresh the topics list
+    } catch (error) {
+      console.error('Error creating topic:', error);
+      toast.error(error.message || 'Failed to create topic');
     }
   };
 
@@ -377,10 +302,7 @@ const Forum = () => {
 
     const handleSubmit = (e) => {
       e.preventDefault();
-      // Mock create topic
-      toast.success('Topic created successfully!');
-      setShowCreateModal(false);
-      setFormData({ title: '', content: '', category: 'general_discussion', tags: '' });
+      handleCreateTopic(formData);
     };
 
     if (!showCreateModal) return null;
@@ -520,19 +442,19 @@ const Forum = () => {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="clay-text-soft text-sm">Total Topics</span>
-                <span className="font-semibold">156</span>
+                <span className="font-semibold">{categories.find(c => c.id === 'all')?.count || 0}</span>
               </div>
               <div className="flex justify-between">
                 <span className="clay-text-soft text-sm">Total Posts</span>
-                <span className="font-semibold">1,245</span>
+                <span className="font-semibold">{topics.reduce((sum, topic) => sum + topic.replies, 0)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="clay-text-soft text-sm">Active Members</span>
-                <span className="font-semibold">89</span>
+                <span className="font-semibold">-</span>
               </div>
               <div className="flex justify-between">
                 <span className="clay-text-soft text-sm">Today's Posts</span>
-                <span className="font-semibold text-green-600">23</span>
+                <span className="font-semibold text-green-600">-</span>
               </div>
             </div>
           </div>
@@ -568,9 +490,15 @@ const Forum = () => {
           {/* Topics List */}
           <div className="space-y-4">
             {topics.length > 0 ? (
-              topics.map(topic => (
-                <TopicCard key={topic.id} topic={topic} />
-              ))
+              topics
+                .filter(topic => 
+                  searchTerm === '' || 
+                  topic.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                  topic.content.toLowerCase().includes(searchTerm.toLowerCase())
+                )
+                .map(topic => (
+                  <TopicCard key={topic.id} topic={topic} />
+                ))
             ) : (
               <div className="clay-card p-12 text-center bg-white/40">
                 <div className="w-16 h-16 clay-card rounded-2xl bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center mx-auto mb-4">
