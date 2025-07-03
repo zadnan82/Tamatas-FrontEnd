@@ -1,4 +1,4 @@
-// src/config/api.js - Fixed version
+// src/config/api.js - Updated for real database connection
 const API_CONFIG = {
   BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:8001',
   
@@ -119,15 +119,12 @@ class ApiClient {
           errorData = { detail: `Request failed with status ${response.status} ${response.statusText}` };
         }
         
-        // Create a proper Error object with the error data
         const error = new Error('API Request Failed');
         error.status = response.status;
         error.data = errorData;
         
-        // Handle different error formats
         if (errorData.detail) {
           if (Array.isArray(errorData.detail)) {
-            // FastAPI validation errors
             error.message = errorData.detail.map(err => {
               const location = err.loc ? err.loc.join('.') : 'unknown field';
               const message = err.msg || 'validation error';
@@ -147,7 +144,6 @@ class ApiClient {
         throw error;
       }
 
-      // Handle successful responses
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         const responseData = await response.json();
@@ -171,7 +167,7 @@ class ApiClient {
   // Auth methods
   async login(email, password) {
     const formData = new FormData();
-    formData.append('username', email); // FastAPI OAuth2 uses 'username'
+    formData.append('username', email);
     formData.append('password', password);
     
     const response = await fetch(`${this.baseURL}${API_CONFIG.AUTH.LOGIN}`, {
@@ -210,9 +206,15 @@ class ApiClient {
     this.setToken(null);
   }
 
-  // Listing methods with better validation
+  async updateProfile(updates) {
+    return this.request(API_CONFIG.USERS.UPDATE_ME, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  // Listing methods - now connected to real database
   async createListing(listingData) {
-    // Validate required fields before sending
     const requiredFields = ['title', 'category', 'listing_type', 'images'];
     const missingFields = requiredFields.filter(field => {
       if (field === 'images') {
@@ -225,22 +227,15 @@ class ApiClient {
       throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
     }
 
-    // Helper function to format date for backend
     const formatDateForBackend = (dateString) => {
       if (!dateString) return null;
-      
-      // If it's already a full datetime, return as is
       if (dateString.includes('T')) return dateString;
-      
-      // If it's just a date (YYYY-MM-DD), add time component
       if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
         return `${dateString}T00:00:00`;
       }
-      
       return dateString;
     };
 
-    // Clean up the data
     const cleanData = {
       title: listingData.title.trim(),
       description: listingData.description || '',
@@ -289,6 +284,10 @@ class ApiClient {
     return this.request(API_CONFIG.LISTINGS.MY_LISTINGS);
   }
 
+  async getListing(id) {
+    return this.request(API_CONFIG.LISTINGS.BY_ID(id));
+  }
+
   async updateListing(id, updates) {
     return this.request(API_CONFIG.LISTINGS.UPDATE(id), {
       method: 'PUT',
@@ -302,7 +301,148 @@ class ApiClient {
     });
   }
 
-  // Add other methods as needed...
+  async getFeeds() {
+    return this.request(API_CONFIG.LISTINGS.FEEDS);
+  }
+
+  // Messages methods
+  async getMessages() {
+    return this.request(API_CONFIG.MESSAGES.BASE);
+  }
+
+  async sendMessage(messageData) {
+    return this.request(API_CONFIG.MESSAGES.BASE, {
+      method: 'POST',
+      body: JSON.stringify(messageData),
+    });
+  }
+
+  async getConversation(userId) {
+    return this.request(API_CONFIG.MESSAGES.CONVERSATION(userId));
+  }
+
+  async markMessageRead(messageId) {
+    return this.request(API_CONFIG.MESSAGES.MARK_READ(messageId), {
+      method: 'PUT',
+    });
+  }
+
+  // Reviews methods
+  async createReview(reviewData) {
+    return this.request(API_CONFIG.REVIEWS.BASE, {
+      method: 'POST',
+      body: JSON.stringify(reviewData),
+    });
+  }
+
+  async getUserReviews(userId) {
+    return this.request(API_CONFIG.REVIEWS.USER_REVIEWS(userId));
+  }
+
+  // Favorites methods
+  async getFavorites() {
+    return this.request(API_CONFIG.FAVORITES.BASE);
+  }
+
+  async addToFavorites(listingId) {
+    return this.request(API_CONFIG.FAVORITES.BASE, {
+      method: 'POST',
+      body: JSON.stringify({ listing_id: listingId }),
+    });
+  }
+
+  async removeFromFavorites(favoriteId) {
+    return this.request(API_CONFIG.FAVORITES.DELETE(favoriteId), {
+      method: 'DELETE',
+    });
+  }
+
+  // Forum methods
+  async getForumTopics(filters = {}) {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value && value !== 'all' && value !== '') {
+        params.append(key, value);
+      }
+    });
+    
+    const query = params.toString();
+    const endpoint = query ? `${API_CONFIG.FORUM.TOPICS}?${query}` : API_CONFIG.FORUM.TOPICS;
+    return this.request(endpoint);
+  }
+
+  async getForumTopic(topicId) {
+    return this.request(API_CONFIG.FORUM.TOPIC_BY_ID(topicId));
+  }
+
+  async createForumTopic(topicData) {
+    return this.request(API_CONFIG.FORUM.TOPICS, {
+      method: 'POST',
+      body: JSON.stringify(topicData),
+    });
+  }
+
+  async getTopicPosts(topicId) {
+    return this.request(API_CONFIG.FORUM.TOPIC_POSTS(topicId));
+  }
+
+  async createForumPost(postData) {
+    return this.request(API_CONFIG.FORUM.POSTS, {
+      method: 'POST',
+      body: JSON.stringify(postData),
+    });
+  }
+
+  // Upload methods
+  async uploadImage(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(`${this.baseURL}${API_CONFIG.UPLOAD.IMAGE}`, {
+      method: 'POST',
+      headers: {
+        Authorization: this.token ? `Bearer ${this.token}` : undefined,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Upload failed');
+    }
+
+    return response.json();
+  }
+
+  async uploadImages(files) {
+    const formData = new FormData();
+    files.forEach(file => {
+      formData.append('files', file);
+    });
+    
+    const response = await fetch(`${this.baseURL}${API_CONFIG.UPLOAD.IMAGES}`, {
+      method: 'POST',
+      headers: {
+        Authorization: this.token ? `Bearer ${this.token}` : undefined,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Upload failed');
+    }
+
+    return response.json();
+  }
+
+  // Contact method
+  async sendContact(contactData) {
+    return this.request(API_CONFIG.CONTACT.BASE, {
+      method: 'POST',
+      body: JSON.stringify(contactData),
+    });
+  }
 }
 
 // Create and export API client instance

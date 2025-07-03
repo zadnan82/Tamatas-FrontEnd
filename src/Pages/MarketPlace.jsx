@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ui/Toast';
+import { apiClient } from '../config/api';
 import { 
   Search, 
   MapPin, 
@@ -49,7 +50,14 @@ const Marketplace = () => {
     { value: 'herbs', label: 'Herbs' },
     { value: 'berries', label: 'Berries' },
     { value: 'root_vegetables', label: 'Root Vegetables' },
-    { value: 'leafy_greens', label: 'Leafy Greens' }
+    { value: 'leafy_greens', label: 'Leafy Greens' },
+    { value: 'citrus_fruits', label: 'Citrus Fruits' },
+    { value: 'stone_fruits', label: 'Stone Fruits' },
+    { value: 'tropical_fruits', label: 'Tropical Fruits' },
+    { value: 'apples_pears', label: 'Apples & Pears' },
+    { value: 'beans_peas', label: 'Beans & Peas' },
+    { value: 'squash_pumpkins', label: 'Squash & Pumpkins' },
+    { value: 'other', label: 'Other' }
   ];
 
   useEffect(() => {
@@ -67,55 +75,14 @@ const Marketplace = () => {
     try {
       setLoading(true);
       
-      // Mock data
-      const mockListings = [
-        {
-          id: 1,
-          title: 'Fresh Organic Tomatoes',
-          description: 'Vine-ripened heirloom tomatoes from our organic farm. Perfect for salads and cooking.',
-          category: 'tomatoes_peppers',
-          listing_type: 'for_sale',
-          price: 4.50,
-          price_unit: 'per_lb',
-          organic: true,
-          images: ['https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400'],
-          location: { city: 'Springfield', state: 'IL' },
-          owner: { full_name: 'John Farmer' },
-          created_date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-          view_count: 45,
-          status: 'active'
-        },
-        {
-          id: 2,
-          title: 'Fresh Basil Leaves',
-          description: 'Aromatic sweet basil, perfect for pesto and Italian cooking.',
-          category: 'herbs',
-          listing_type: 'for_sale',
-          price: 3.00,
-          price_unit: 'per_bag',
-          organic: true,
-          images: ['https://images.unsplash.com/photo-1618375569909-3c8616cf5ecf?w=400'],
-          location: { city: 'Madison', state: 'WI' },
-          owner: { full_name: 'Jane Gardener' },
-          created_date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
-          view_count: 23,
-          status: 'active'
-        },
-        {
-          id: 3,
-          title: 'Looking for Fresh Strawberries',
-          description: 'Restaurant looking for 10+ lbs of fresh strawberries for our dessert menu.',
-          category: 'berries',
-          listing_type: 'looking_for',
-          location: { city: 'Chicago', state: 'IL' },
-          owner: { full_name: 'Chef Mike' },
-          created_date: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-          view_count: 12,
-          status: 'active'
-        }
-      ];
+      // Load real listings from database
+      const data = await apiClient.getListings({
+        skip: 0,
+        limit: 100,
+        ...filters
+      });
       
-      setListings(mockListings);
+      setListings(data || []);
     } catch (error) {
       console.error('Error loading listings:', error);
       toast.error('Failed to load listings');
@@ -126,8 +93,8 @@ const Marketplace = () => {
 
   const loadFavorites = async () => {
     try {
-      // Mock favorites
-      setFavorites([1, 3]);
+      const favoritesData = await apiClient.getFavorites();
+      setFavorites(favoritesData.map(fav => fav.listing_id) || []);
     } catch (error) {
       console.error('Error loading favorites:', error);
     }
@@ -176,6 +143,20 @@ const Marketplace = () => {
       });
     }
 
+    // Apply sorting
+    switch (filters.sort_by) {
+      case 'price':
+        filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
+        break;
+      case 'view_count':
+        filtered.sort((a, b) => (b.view_count || 0) - (a.view_count || 0));
+        break;
+      case 'created_date':
+      default:
+        filtered.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+        break;
+    }
+
     setFilteredListings(filtered);
   };
 
@@ -188,9 +169,16 @@ const Marketplace = () => {
     try {
       const isFavorited = favorites.includes(listingId);
       if (isFavorited) {
-        setFavorites(prev => prev.filter(id => id !== listingId));
-        toast.success('Removed from favorites');
+        // Find the favorite to remove
+        const favoritesData = await apiClient.getFavorites();
+        const favoriteToRemove = favoritesData.find(fav => fav.listing_id === listingId);
+        if (favoriteToRemove) {
+          await apiClient.removeFromFavorites(favoriteToRemove.id);
+          setFavorites(prev => prev.filter(id => id !== listingId));
+          toast.success('Removed from favorites');
+        }
       } else {
+        await apiClient.addToFavorites(listingId);
         setFavorites(prev => [...prev, listingId]);
         toast.success('Added to favorites');
       }
@@ -202,6 +190,8 @@ const Marketplace = () => {
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
+    // Reload listings with new filters
+    loadListings();
   };
 
   const clearFilters = () => {
@@ -214,7 +204,7 @@ const Marketplace = () => {
       price_range: 'all',
       sort_by: 'created_date'
     };
-    handleFilterChange(defaultFilters);
+    setFilters(defaultFilters);
   };
 
   const ListingCard = ({ listing, compact = false }) => {

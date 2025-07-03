@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useToast } from '../components/ui/Toast';
+import { apiClient } from '../config/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import { 
@@ -35,97 +36,44 @@ const Feeds = () => {
     try {
       setLoading(true);
       
-      // Mock feed data - replace with actual API call
-      const mockFeeds = [
-        {
-          id: 1,
-          type: 'new_listing',
-          title: 'New listing posted',
-          content: 'Fresh Organic Tomatoes',
-          user: {
-            name: 'John Farmer',
-            avatar: '/placeholder-avatar.jpg',
-            location: 'Springfield, IL'
-          },
-          listing: {
-            id: 1,
-            title: 'Fresh Organic Tomatoes',
-            price: 4.50,
-            image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400',
-            category: 'tomatoes_peppers',
-            organic: true
-          },
-          timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-          interactions: { likes: 12, comments: 3, views: 45 }
-        },
-        {
-          id: 2,
-          type: 'trade_completed',
-          title: 'Trade completed',
-          content: 'Successfully traded basil for mint',
-          user: {
-            name: 'Jane Gardener',
-            avatar: '/placeholder-avatar.jpg',
-            location: 'Madison, WI'
-          },
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-          interactions: { likes: 24, comments: 8 }
-        },
-        {
-          id: 3,
-          type: 'review_posted',
-          title: 'New review posted',
-          content: 'Excellent quality strawberries! Highly recommend.',
-          user: {
-            name: 'Chef Mike',
-            avatar: '/placeholder-avatar.jpg',
-            location: 'Chicago, IL'
-          },
-          rating: 5,
-          reviewedUser: 'Berry Farm Co.',
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4), // 4 hours ago
-          interactions: { likes: 8, comments: 2 }
-        },
-        {
-          id: 4,
-          type: 'community_milestone',
-          title: 'Community milestone',
-          content: 'Fresh Trade has reached 5,000 active users!',
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
-          interactions: { likes: 156, comments: 23 },
-          featured: true
-        },
-        {
-          id: 5,
-          type: 'new_user',
-          title: 'New member joined',
-          content: 'Welcome to the Fresh Trade community!',
-          user: {
-            name: 'Sarah Green',
-            avatar: '/placeholder-avatar.jpg',
-            location: 'Portland, OR'
-          },
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 8), // 8 hours ago
-          interactions: { likes: 15, comments: 5 }
-        },
-        {
-          id: 6,
-          type: 'seasonal_tip',
-          title: 'Seasonal gardening tip',
-          content: 'Perfect time to plant winter vegetables in your area!',
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 12), // 12 hours ago
-          interactions: { likes: 67, comments: 12 },
-          tips: ['Plant kale and spinach now', 'Cover tender plants', 'Harvest last tomatoes']
-        }
-      ];
+      // Load real feeds from database
+      const feedData = await apiClient.getFeeds();
       
-      // Apply filters
-      let filtered = mockFeeds;
+      // Transform listings into feed format
+      const feedItems = feedData.map(listing => ({
+        id: listing.id,
+        type: 'new_listing',
+        title: 'New listing posted',
+        content: listing.title,
+        user: {
+          name: listing.owner?.full_name || 'Anonymous User',
+          avatar: listing.owner?.profile_image || null,
+          location: listing.location ? `${listing.location.city}, ${listing.location.state}` : 'Unknown location'
+        },
+        listing: {
+          id: listing.id,
+          title: listing.title,
+          price: listing.price,
+          image: listing.images && listing.images[0] ? listing.images[0] : null,
+          category: listing.category,
+          organic: listing.organic,
+          listing_type: listing.listing_type
+        },
+        timestamp: new Date(listing.created_date),
+        interactions: { 
+          likes: 0, // Will be implemented with likes system
+          comments: 0, // Will be implemented with comments system
+          views: listing.view_count || 0 
+        }
+      }));
+
+      // Apply filter
+      let filteredFeeds = feedItems;
       if (filter !== 'all') {
-        filtered = mockFeeds.filter(feed => feed.type === filter);
+        filteredFeeds = feedItems.filter(feed => feed.type === filter);
       }
       
-      setFeeds(filtered);
+      setFeeds(filteredFeeds);
     } catch (error) {
       console.error('Error loading feeds:', error);
       toast.error('Failed to load feeds');
@@ -153,7 +101,13 @@ const Feeds = () => {
     return icons[type] || Clock;
   };
 
-  const getTypeColor = (type) => {
+  const getTypeColor = (type, listingType = null) => {
+    if (type === 'new_listing' && listingType) {
+      return listingType === 'for_sale' 
+        ? 'from-green-400 to-emerald-500'
+        : 'from-blue-400 to-cyan-500';
+    }
+    
     const colors = {
       new_listing: 'from-green-400 to-emerald-500',
       trade_completed: 'from-pink-400 to-rose-500',
@@ -167,6 +121,7 @@ const Feeds = () => {
 
   const FeedCard = ({ feed }) => {
     const TypeIcon = getTypeIcon(feed.type);
+    const typeColor = getTypeColor(feed.type, feed.listing?.listing_type);
     
     return (
       <div className={`clay-card p-6 ${feed.featured ? 'bg-gradient-to-br from-yellow-50 to-orange-50' : 'bg-white/60'} backdrop-blur-sm group hover:scale-[1.02] transition-all duration-300`}>
@@ -177,7 +132,7 @@ const Feeds = () => {
         )}
         
         <div className="flex items-start gap-4">
-          <div className={`w-12 h-12 bg-gradient-to-br ${getTypeColor(feed.type)} rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-300`}>
+          <div className={`w-12 h-12 bg-gradient-to-br ${typeColor} rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-300`}>
             <TypeIcon className="w-6 h-6 text-white" />
           </div>
           
@@ -193,11 +148,19 @@ const Feeds = () => {
             {feed.user && (
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-8 h-8 clay-card rounded-xl overflow-hidden">
-                  <div className="w-full h-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center">
-                    <span className="text-white font-semibold text-sm">
-                      {feed.user.name.charAt(0)}
-                    </span>
-                  </div>
+                  {feed.user.avatar ? (
+                    <img 
+                      src={feed.user.avatar} 
+                      alt={feed.user.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center">
+                      <span className="text-white font-semibold text-sm">
+                        {feed.user.name.charAt(0)}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="font-medium text-sm">{feed.user.name}</p>
@@ -215,59 +178,44 @@ const Feeds = () => {
             
             {/* Listing Card */}
             {feed.listing && (
-              <div className="clay-card p-4 bg-white/80 mb-4">
-                <div className="flex items-center gap-3">
-                  <img 
-                    src={feed.listing.image} 
-                    alt={feed.listing.title}
-                    className="w-16 h-16 rounded-xl object-cover"
-                  />
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-sm mb-1">{feed.listing.title}</h4>
-                    <p className="text-green-600 font-bold">${feed.listing.price}/lb</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      {feed.listing.organic && (
-                        <div className="clay-badge clay-badge-green text-xs px-2 py-1">
-                          <Leaf className="w-3 h-3 mr-1" />
-                          Organic
-                        </div>
+              <Link to={`/listing/${feed.listing.id}`}>
+                <div className="clay-card p-4 bg-white/80 mb-4 hover:bg-white/90 transition-colors">
+                  <div className="flex items-center gap-3">
+                    {feed.listing.image ? (
+                      <img 
+                        src={feed.listing.image} 
+                        alt={feed.listing.title}
+                        className="w-16 h-16 rounded-xl object-cover"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center">
+                        <Leaf className="w-6 h-6 text-white" />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-sm mb-1">{feed.listing.title}</h4>
+                      {feed.listing.price && (
+                        <p className="text-green-600 font-bold">${feed.listing.price}</p>
                       )}
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge className={`text-xs px-2 py-1 ${
+                          feed.listing.listing_type === 'for_sale' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {feed.listing.listing_type === 'for_sale' ? 'For Sale' : 'Looking For'}
+                        </Badge>
+                        {feed.listing.organic && (
+                          <div className="clay-badge clay-badge-green text-xs px-2 py-1">
+                            <Leaf className="w-3 h-3 mr-1" />
+                            Organic
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
-            
-            {/* Review Rating */}
-            {feed.rating && (
-              <div className="clay-card p-3 bg-white/80 mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="flex">
-                    {[...Array(5)].map((_, i) => (
-                      <Star 
-                        key={i} 
-                        className={`w-4 h-4 ${i < feed.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} 
-                      />
-                    ))}
-                  </div>
-                  <span className="clay-text-soft text-sm">for {feed.reviewedUser}</span>
-                </div>
-              </div>
-            )}
-            
-            {/* Tips */}
-            {feed.tips && (
-              <div className="clay-card p-4 bg-gradient-to-br from-green-50 to-emerald-50 mb-4">
-                <h5 className="font-semibold text-sm mb-2 text-green-800">💡 Tips:</h5>
-                <ul className="space-y-1">
-                  {feed.tips.map((tip, index) => (
-                    <li key={index} className="clay-text-soft text-sm flex items-center gap-2">
-                      <div className="w-1 h-1 bg-green-500 rounded-full"></div>
-                      {tip}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              </Link>
             )}
             
             {/* Interactions */}
@@ -280,7 +228,7 @@ const Feeds = () => {
                 <MessageSquare className="w-4 h-4" />
                 <span className="text-sm font-medium">{feed.interactions.comments}</span>
               </button>
-              {feed.interactions.views && (
+              {feed.interactions.views > 0 && (
                 <div className="flex items-center gap-2 clay-text-soft">
                   <Eye className="w-4 h-4" />
                   <span className="text-sm font-medium">{feed.interactions.views}</span>
@@ -364,7 +312,7 @@ const Feeds = () => {
             <h3 className="clay-text-title text-xl font-semibold mb-2">No activity found</h3>
             <p className="clay-text-soft mb-6">
               {filter === 'all' 
-                ? "Your feed is empty. Start by creating a listing or following other users!"
+                ? "Your feed is empty. Start by creating a listing or browse the marketplace!"
                 : `No ${filters.find(f => f.value === filter)?.label.toLowerCase()} found.`
               }
             </p>
@@ -382,7 +330,10 @@ const Feeds = () => {
       {/* Load More */}
       {feeds.length > 0 && (
         <div className="text-center mt-8">
-          <button className="clay-button px-8 py-3 font-semibold">
+          <button 
+            onClick={loadFeeds}
+            className="clay-button px-8 py-3 font-semibold"
+          >
             Load More Activity
           </button>
         </div>
