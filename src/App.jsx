@@ -58,9 +58,9 @@ const AppContent = () => {
           <Route path="/profile" element={user ? <Profile /> : <Navigate to="/" />} />
           <Route path="/user/:id" element={<UserProfile />} />
           <Route path="/favorites" element={user ? <Favorites /> : <Navigate to="/" />} />
-          <Route path="/feeds" element={<Feeds />} />
+          <Route path="/feeds" element={<Feeds />} /> 
           <Route path="/forum" element={<Forum />} />
-          <Route path="/forum/topic/:id" element={<Topic />} />
+          <Route path="/forum/topic/:topicId" element={<Topic />} />
           <Route path="/forum/create" element={user ? <CreateForumTopic /> : <Navigate to="/" />} />
           <Route path="/contact" element={<Contact />} />
         </Routes>

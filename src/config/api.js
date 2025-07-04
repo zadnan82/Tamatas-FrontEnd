@@ -70,17 +70,26 @@ class ApiClient {
     }
   }
 
-  getHeaders() {
-    const headers = {
-      'Content-Type': 'application/json',
-    };
-    
-    if (this.token) {
-      headers.Authorization = `Bearer ${this.token}`;
-    }
-    
-    return headers;
+  // In your api.js, update the getHeaders() method:
+
+getHeaders() {
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (this.token) {
+    headers.Authorization = `Bearer ${this.token}`;
+    console.log('🔐 getHeaders - Token exists:', this.token.substring(0, 20) + '...');
+    console.log('🔐 getHeaders - Authorization header:', headers.Authorization.substring(0, 30) + '...');
+  } else {
+    console.log('🔐 getHeaders - NO TOKEN FOUND');
   }
+  
+  console.log('🔐 getHeaders - All headers:', headers);
+  return headers;
+}
+
+ 
 
   // Enhanced token validation
   isTokenValid() {
@@ -110,41 +119,39 @@ class ApiClient {
     window.dispatchEvent(new CustomEvent('auth:expired'));
   }
 
-  async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
+  // And update your request method to log the exact headers being sent:
+async request(endpoint, options = {}) {
+  const url = `${this.baseURL}${endpoint}`;
+  
+  const config = {
+  ...options,
+  headers: {
+    ...this.getHeaders(),
+    ...options.headers
+  }
+};
+
+  console.log(`🔐 REQUEST: ${config.method || 'GET'} ${url}`);
+  console.log('🔐 REQUEST HEADERS:', config.headers);
+  console.log('🔐 REQUEST BODY:', config.body);
+  
+  try {
+    const response = await fetch(url, config);
     
-    // Check token validity before making request
-    if (this.token && !this.isTokenValid()) {
-      console.warn('Token appears to be expired or invalid');
-      this.handleAuthFailure();
-      throw new Error('Authentication required');
-    }
-
-    const config = {
-      headers: this.getHeaders(),
-      ...options,
-    };
-
-    try {
-      console.log(`Making ${config.method || 'GET'} request to:`, url);
-      if (config.body) {
-        console.log('Request body:', config.body);
-      }
-      
-      const response = await fetch(url, config);
-      
-      console.log('Response status:', response.status);
+    console.log('🔐 RESPONSE STATUS:', response.status);
+  
+  
+        
       console.log('Response ok:', response.ok);
       
       // Handle different types of failures
       if (!response.ok) {
         // Handle auth failures specifically
-        if (response.status === 401) {
-          console.warn('Received 401 Unauthorized response');
-          this.handleAuthFailure();
-          throw new Error('Authentication required');
-        }
-
+       if (response.status === 401) {
+  console.warn('Received 401 Unauthorized response');
+  // this.handleAuthFailure(); // ← COMMENTED OUT
+  throw new Error('Authentication required');
+}
         let errorData;
         const contentType = response.headers.get('content-type');
         
@@ -411,19 +418,13 @@ async login(email, password) {
     }
 
     try {
-      return await this.request(API_CONFIG.MESSAGES.BASE, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...messageData,
-          // Ensure dates are properly formatted if present
-          created_date: messageData.created_date 
-            ? new Date(messageData.created_date).toISOString() 
-            : undefined
-        }),
-      });
+
+      
+      // CORRECT:
+return await this.request('/messages', {
+  method: 'POST',
+  body: JSON.stringify(messageData),
+}); 
     } catch (error) {
       console.error('Failed to send message:', error);
       if (error.status === 401) {
@@ -534,6 +535,27 @@ async login(email, password) {
     return this.request(API_CONFIG.FORUM.POSTS, {
       method: 'POST',
       body: JSON.stringify(postData),
+    });
+  }
+
+  // ADD THESE TWO NEW METHODS HERE:
+  async toggleTopicLike(topicId) {
+    return this.request(`/forum/topics/${topicId}/like`, {
+      method: 'POST',
+    });
+  }
+
+  async togglePostLike(postId) {
+    return this.request(`/forum/posts/${postId}/like`, {
+      method: 'POST',
+    });
+  }
+
+  // Contact method
+  async sendContact(contactData) {
+    return this.request(API_CONFIG.CONTACT.BASE, {
+      method: 'POST',
+      body: JSON.stringify(contactData),
     });
   }
 

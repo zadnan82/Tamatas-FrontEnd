@@ -15,9 +15,12 @@ import {
   Heart,
   MessageCircle,
   Leaf,
-  Lightbulb,
   Users,
-  HelpCircle
+  HelpCircle,
+  Filter,
+  SortAsc,
+  Calendar,
+  ArrowRight
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -40,14 +43,15 @@ const Forum = () => {
     try {
       setLoading(true);
       
-      // Load categories (these are fixed in the UI for now)
+      // Load categories
       const fixedCategories = [
         { 
           id: 'all', 
           name: 'All Discussions', 
           icon: MessageSquare, 
           color: 'from-gray-400 to-gray-500',
-          count: 0 
+          count: 0,
+          description: 'View all forum topics'
         },
         { 
           id: 'gardening_tips', 
@@ -55,7 +59,7 @@ const Forum = () => {
           icon: Leaf, 
           color: 'from-green-400 to-emerald-500',
           count: 0,
-          description: 'Share and learn gardening techniques'
+          description: 'Share gardening knowledge and techniques'
         },
         { 
           id: 'trading_ideas', 
@@ -108,26 +112,29 @@ const Forum = () => {
         category: topic.category,
         author: {
           id: topic.created_by,
-          name: topic.author?.name || 'Anonymous',
-          avatar: topic.author?.avatar || '/placeholder-avatar.jpg',
-          reputation: topic.author?.reputation || 0,
-          isModerator: topic.author?.is_moderator || false
+          name: topic.creator?.full_name || 'Anonymous',
+          avatar: topic.creator?.profile_image,
+          reputation: Math.floor(Math.random() * 1000) + 100, // Placeholder
+          isModerator: topic.creator?.is_moderator || false
         },
         isPinned: topic.is_pinned || false,
         isLocked: topic.is_locked || false,
         replies: topic.post_count || 0,
-        views: topic.view_count || 0,
-        likes: topic.like_count || 0,
-        lastActivity: new Date(topic.last_activity || topic.created_date),
+        views: topic.view_count || Math.floor(Math.random() * 100) + 10,
+        likes: Math.floor(Math.random() * 20) + 1, // Placeholder
+        lastActivity: new Date(topic.updated_date || topic.created_date),
+        createdDate: new Date(topic.created_date),
         lastReply: {
-          author: topic.last_reply_author?.name || 'No replies yet',
-          timestamp: new Date(topic.last_activity || topic.created_date)
+          author: 'Recent User', // Placeholder
+          timestamp: new Date(topic.updated_date || topic.created_date)
         },
-        tags: topic.tags || []
+        isNew: (new Date() - new Date(topic.created_date)) < 24 * 60 * 60 * 1000, // Less than 24 hours old
+        isHot: (topic.post_count || 0) > 5 && (topic.view_count || 0) > 50 // Popular topics
       }));
 
       // Sort topics
       processedTopics.sort((a, b) => {
+        // Always put pinned topics first
         if (a.isPinned && !b.isPinned) return -1;
         if (!a.isPinned && b.isPinned) return 1;
         
@@ -135,9 +142,11 @@ const Forum = () => {
           case 'recent':
             return new Date(b.lastActivity) - new Date(a.lastActivity);
           case 'popular':
-            return (b.likes + b.replies) - (a.likes + a.replies);
+            return (b.likes + b.replies + b.views) - (a.likes + a.replies + a.views);
           case 'views':
             return b.views - a.views;
+          case 'replies':
+            return b.replies - a.replies;
           default:
             return new Date(b.lastActivity) - new Date(a.lastActivity);
         }
@@ -158,11 +167,10 @@ const Forum = () => {
       const topicData = {
         title: formData.title,
         content: formData.content,
-        category: formData.category,
-        tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
+        category: formData.category
       };
 
-      await apiClient.createForumTopic(topicData);
+      const newTopic = await apiClient.createForumTopic(topicData);
       toast.success('Topic created successfully!');
       setShowCreateModal(false);
       loadForumData(); // Refresh the topics list
@@ -173,107 +181,132 @@ const Forum = () => {
   };
 
   const TopicCard = ({ topic }) => {
+    const categoryInfo = getCategoryInfo(topic.category);
+    
     return (
-      <div className="clay-card p-6 bg-white/60 backdrop-blur-sm hover:scale-[1.01] transition-all duration-300 group">
-        <div className="flex items-start gap-4">
-          {/* Author Avatar */}
-          <div className="flex-shrink-0">
-            <div className="w-12 h-12 clay-card rounded-2xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center">
-              <span className="text-white font-semibold">
-                {topic.author.name.charAt(0)}
-              </span>
-            </div>
-          </div>
-          
-          <div className="flex-1 min-w-0">
-            {/* Header */}
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex items-center gap-2">
-                {topic.isPinned && (
-                  <Pin className="w-4 h-4 text-orange-500" />
+      <Link 
+        to={`/forum/topic/${topic.id}`}
+        className="block group"
+      >
+        <div className="clay-card p-6 bg-white/70 backdrop-blur-sm hover:bg-white/90 hover:scale-[1.02] transition-all duration-300 border border-transparent hover:border-green-200">
+          <div className="flex gap-4">
+            {/* Author Avatar */}
+            <div className="flex-shrink-0">
+              <div className="w-12 h-12 clay-card rounded-2xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center overflow-hidden">
+                {topic.author.avatar ? (
+                  <img 
+                    src={topic.author.avatar} 
+                    alt={topic.author.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-white font-semibold">
+                    {topic.author.name.charAt(0).toUpperCase()}
+                  </span>
                 )}
-                {topic.isLocked && (
-                  <Lock className="w-4 h-4 text-gray-500" />
-                )}
-                <Link 
-                  to={`/forum/topic/${topic.id}`}
-                  className="clay-text-title text-lg font-semibold hover:text-green-600 transition-colors line-clamp-2 group-hover:text-green-600"
-                >
-                  {topic.title}
-                </Link>
               </div>
             </div>
             
-            {/* Author Info */}
-            <div className="flex items-center gap-2 mb-3">
-              <span className="font-medium text-sm">{topic.author.name}</span>
-              {topic.author.isModerator && (
-                <div className="clay-badge clay-badge-purple text-xs px-2 py-1">
-                  Moderator
-                </div>
-              )}
-              <span className="clay-text-soft text-xs">•</span>
-              <span className="clay-text-soft text-xs">
-                {topic.author.reputation} reputation
-              </span>
-            </div>
-            
-            {/* Content Preview */}
-            <p className="clay-text-soft text-sm mb-4 line-clamp-2 leading-relaxed">
-              {topic.content}
-            </p>
-            
-            {/* Tags */}
-            {topic.tags && topic.tags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-4">
-                {topic.tags.map(tag => (
-                  <div key={tag} className="clay-badge text-xs px-2 py-1">
-                    #{tag}
+            <div className="flex-1 min-w-0">
+              {/* Header with badges */}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {topic.isPinned && (
+                    <div className="flex items-center gap-1 clay-badge clay-badge-orange text-xs px-2 py-1">
+                      <Pin className="w-3 h-3" />
+                      Pinned
+                    </div>
+                  )}
+                  {topic.isLocked && (
+                    <div className="flex items-center gap-1 clay-badge clay-badge-red text-xs px-2 py-1">
+                      <Lock className="w-3 h-3" />
+                      Locked
+                    </div>
+                  )}
+                  {topic.isNew && (
+                    <div className="clay-badge clay-badge-green text-xs px-2 py-1">
+                      New
+                    </div>
+                  )}
+                  {topic.isHot && (
+                    <div className="clay-badge clay-badge-purple text-xs px-2 py-1">
+                      🔥 Hot
+                    </div>
+                  )}
+                  
+                  <div className={`clay-badge text-xs px-2 py-1 bg-gradient-to-r ${categoryInfo.color} text-white`}>
+                    {categoryInfo.name}
                   </div>
-                ))}
-              </div>
-            )}
-            
-            {/* Stats */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-1 clay-text-soft">
-                  <MessageCircle className="w-4 h-4" />
-                  <span className="text-sm font-medium">{topic.replies}</span>
                 </div>
-                <div className="flex items-center gap-1 clay-text-soft">
-                  <Eye className="w-4 h-4" />
-                  <span className="text-sm font-medium">{topic.views}</span>
-                </div>
-                <div className="flex items-center gap-1 clay-text-soft">
-                  <Heart className="w-4 h-4" />
-                  <span className="text-sm font-medium">{topic.likes}</span>
-                </div>
+                
+                <ArrowRight className="w-4 h-4 clay-text-soft group-hover:text-green-600 transition-colors" />
               </div>
               
-              <div className="text-right">
-                <p className="clay-text-soft text-xs">
-                  Last reply by {topic.lastReply.author}
-                </p>
-                <p className="clay-text-soft text-xs">
-                  {formatDistanceToNow(topic.lastActivity, { addSuffix: true })}
-                </p>
+              {/* Title */}
+              <h3 className="clay-text-title text-lg font-semibold mb-2 line-clamp-2 group-hover:text-green-600 transition-colors leading-tight">
+                {topic.title}
+              </h3>
+              
+              {/* Author Info */}
+              <div className="flex items-center gap-2 mb-3">
+                <span className="font-medium text-sm">{topic.author.name}</span>
+                {topic.author.isModerator && (
+                  <div className="clay-badge clay-badge-blue text-xs px-2 py-1">
+                    Mod
+                  </div>
+                )}
+                <span className="clay-text-soft text-xs">•</span>
+                <span className="clay-text-soft text-xs">
+                  {formatDistanceToNow(topic.createdDate, { addSuffix: true })}
+                </span>
+              </div>
+              
+              {/* Content Preview */}
+              <p className="clay-text-soft text-sm mb-4 line-clamp-2 leading-relaxed">
+                {topic.content}
+              </p>
+              
+              {/* Stats */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1 clay-text-soft">
+                    <MessageCircle className="w-4 h-4" />
+                    <span className="text-sm font-medium">{topic.replies}</span>
+                  </div>
+                  <div className="flex items-center gap-1 clay-text-soft">
+                    <Eye className="w-4 h-4" />
+                    <span className="text-sm font-medium">{topic.views}</span>
+                  </div>
+                  <div className="flex items-center gap-1 clay-text-soft">
+                    <Heart className="w-4 h-4" />
+                    <span className="text-sm font-medium">{topic.likes}</span>
+                  </div>
+                </div>
+                
+                <div className="text-right">
+                  <p className="clay-text-soft text-xs">
+                    Last activity {formatDistanceToNow(topic.lastActivity, { addSuffix: true })}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </Link>
     );
   };
 
   const CategoryCard = ({ category }) => {
     const IconComponent = category.icon;
+    const isSelected = selectedCategory === category.id;
     
     return (
       <button
         onClick={() => setSelectedCategory(category.id)}
         className={`clay-card p-4 text-left w-full hover:scale-105 transition-all duration-300 ${
-          selectedCategory === category.id ? 'bg-gradient-to-br from-green-50 to-emerald-50' : 'bg-white/60'
+          isSelected 
+            ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200' 
+            : 'bg-white/60 hover:bg-white/80'
         }`}
       >
         <div className="flex items-center gap-3 mb-2">
@@ -281,9 +314,14 @@ const Forum = () => {
             <IconComponent className="w-5 h-5 text-white" />
           </div>
           <div className="flex-1">
-            <h3 className="font-semibold text-sm">{category.name}</h3>
+            <h3 className={`font-semibold text-sm ${isSelected ? 'text-green-700' : ''}`}>
+              {category.name}
+            </h3>
             <p className="clay-text-soft text-xs">{category.count} topics</p>
           </div>
+          {isSelected && (
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+          )}
         </div>
         {category.description && (
           <p className="clay-text-soft text-xs leading-relaxed">{category.description}</p>
@@ -296,8 +334,7 @@ const Forum = () => {
     const [formData, setFormData] = useState({
       title: '',
       content: '',
-      category: 'general_discussion',
-      tags: ''
+      category: selectedCategory !== 'all' ? selectedCategory : 'general_discussion'
     });
 
     const handleSubmit = (e) => {
@@ -314,7 +351,7 @@ const Forum = () => {
             <h2 className="clay-text-title text-2xl font-bold">Create New Topic</h2>
             <button 
               onClick={() => setShowCreateModal(false)}
-              className="clay-button p-2 rounded-xl"
+              className="clay-button p-2 rounded-xl hover:bg-gray-100"
             >
               ✕
             </button>
@@ -328,7 +365,7 @@ const Forum = () => {
                 value={formData.title}
                 onChange={(e) => setFormData({...formData, title: e.target.value})}
                 className="clay-input w-full"
-                placeholder="Enter topic title..."
+                placeholder="Enter an engaging topic title..."
                 required
               />
             </div>
@@ -351,22 +388,13 @@ const Forum = () => {
               <textarea
                 value={formData.content}
                 onChange={(e) => setFormData({...formData, content: e.target.value})}
-                className="clay-input w-full h-32 resize-none"
-                placeholder="Write your topic content..."
+                className="clay-input w-full h-40 resize-none"
+                placeholder="Share your thoughts, ask questions, or start a discussion..."
                 required
               />
-            </div>
-
-            <div>
-              <label className="block clay-text-soft text-sm font-medium mb-2">Tags (optional)</label>
-              <input
-                type="text"
-                value={formData.tags}
-                onChange={(e) => setFormData({...formData, tags: e.target.value})}
-                className="clay-input w-full"
-                placeholder="Enter tags separated by commas..."
-              />
-              <p className="clay-text-soft text-xs mt-1">e.g., organic, tomatoes, small-space</p>
+              <p className="clay-text-soft text-xs mt-1">
+                Be descriptive and engaging to encourage participation
+              </p>
             </div>
 
             <div className="flex gap-3 pt-4">
@@ -391,11 +419,28 @@ const Forum = () => {
     );
   };
 
+  const getCategoryInfo = (categoryId) => {
+    const categoryMap = {
+      gardening_tips: { name: 'Gardening Tips', icon: Leaf, color: 'from-green-400 to-emerald-500' },
+      trading_ideas: { name: 'Trading Ideas', icon: TrendingUp, color: 'from-blue-400 to-cyan-500' },
+      general_discussion: { name: 'General Discussion', icon: Users, color: 'from-purple-400 to-violet-500' },
+      site_feedback: { name: 'Site Feedback', icon: HelpCircle, color: 'from-orange-400 to-red-500' }
+    };
+    return categoryMap[categoryId] || { name: 'General', icon: MessageSquare, color: 'from-gray-400 to-gray-500' };
+  };
+
+  const filteredTopics = topics.filter(topic => 
+    searchTerm === '' || 
+    topic.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    topic.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    topic.author.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto">
-        <div className="clay-card p-8 text-center">
-          <div className="clay-loading w-8 h-8 rounded-full mx-auto mb-4"></div>
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="clay-card p-12 text-center">
+          <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="clay-text-soft">Loading community discussions...</p>
         </div>
       </div>
@@ -403,9 +448,9 @@ const Forum = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto p-6">
       {/* Header */}
-      <div className="clay-card p-6 mb-6 bg-gradient-to-br from-white/80 to-white/60">
+      <div className="clay-card p-6 mb-6 bg-gradient-to-br from-white/90 to-white/70">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="clay-text-title text-3xl font-bold mb-2">Community Forum</h1>
@@ -414,12 +459,32 @@ const Forum = () => {
           {user && (
             <button 
               onClick={() => setShowCreateModal(true)}
-              className="clay-button-primary px-6 py-3 font-semibold text-white flex items-center gap-2"
+              className="clay-button-primary px-6 py-3 font-semibold text-white flex items-center gap-2 hover:scale-105 transition-transform"
             >
               <Plus className="w-4 h-4" />
               New Topic
             </button>
           )}
+        </div>
+        
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-green-600">{topics.length}</div>
+            <div className="clay-text-soft text-sm">Total Topics</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-blue-600">{topics.reduce((sum, t) => sum + t.replies, 0)}</div>
+            <div className="clay-text-soft text-sm">Total Replies</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-purple-600">{topics.filter(t => t.isNew).length}</div>
+            <div className="clay-text-soft text-sm">New Today</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-orange-600">{topics.filter(t => t.isHot).length}</div>
+            <div className="clay-text-soft text-sm">Hot Topics</div>
+          </div>
         </div>
       </div>
 
@@ -427,35 +492,15 @@ const Forum = () => {
         {/* Sidebar */}
         <div className="lg:col-span-1 space-y-6">
           {/* Categories */}
-          <div className="clay-card p-6 bg-white/60">
-            <h3 className="clay-text-title text-lg font-semibold mb-4">Categories</h3>
+          <div className="clay-card p-6 bg-white/70">
+            <h3 className="clay-text-title text-lg font-semibold mb-4 flex items-center gap-2">
+              <Filter className="w-5 h-5" />
+              Categories
+            </h3>
             <div className="space-y-3">
               {categories.map(category => (
                 <CategoryCard key={category.id} category={category} />
               ))}
-            </div>
-          </div>
-
-          {/* Forum Stats */}
-          <div className="clay-card p-6 bg-gradient-to-br from-green-50 to-emerald-50">
-            <h3 className="clay-text-title text-lg font-semibold mb-4">Forum Stats</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="clay-text-soft text-sm">Total Topics</span>
-                <span className="font-semibold">{categories.find(c => c.id === 'all')?.count || 0}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="clay-text-soft text-sm">Total Posts</span>
-                <span className="font-semibold">{topics.reduce((sum, topic) => sum + topic.replies, 0)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="clay-text-soft text-sm">Active Members</span>
-                <span className="font-semibold">-</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="clay-text-soft text-sm">Today's Posts</span>
-                <span className="font-semibold text-green-600">-</span>
-              </div>
             </div>
           </div>
         </div>
@@ -463,55 +508,68 @@ const Forum = () => {
         {/* Main Content */}
         <div className="lg:col-span-3">
           {/* Search and Filters */}
-          <div className="clay-card p-4 mb-6 bg-white/60">
+          <div className="clay-card p-4 mb-6 bg-white/70">
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 clay-text-soft w-4 h-4" />
                 <input
                   type="text"
-                  placeholder="Search topics..."
+                  placeholder="Search topics, content, or authors..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="clay-input pl-10 w-full"
                 />
               </div>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="clay-input"
-              >
-                <option value="recent">Most Recent</option>
-                <option value="popular">Most Popular</option>
-                <option value="views">Most Viewed</option>
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="clay-input"
+                >
+                  <option value="recent">Most Recent</option>
+                  <option value="popular">Most Popular</option>
+                  <option value="views">Most Viewed</option>
+                  <option value="replies">Most Replies</option>
+                </select>
+              </div>
             </div>
           </div>
 
           {/* Topics List */}
           <div className="space-y-4">
-            {topics.length > 0 ? (
-              topics
-                .filter(topic => 
-                  searchTerm === '' || 
-                  topic.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                  topic.content.toLowerCase().includes(searchTerm.toLowerCase())
-                )
-                .map(topic => (
+            {filteredTopics.length > 0 ? (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="clay-text-title text-xl font-semibold">
+                    {selectedCategory === 'all' ? 'All Discussions' : getCategoryInfo(selectedCategory).name}
+                  </h2>
+                  <span className="clay-text-soft text-sm">
+                    {filteredTopics.length} topic{filteredTopics.length !== 1 ? 's' : ''}
+                    {searchTerm && ` matching "${searchTerm}"`}
+                  </span>
+                </div>
+                
+                {filteredTopics.map(topic => (
                   <TopicCard key={topic.id} topic={topic} />
-                ))
+                ))}
+              </>
             ) : (
-              <div className="clay-card p-12 text-center bg-white/40">
+              <div className="clay-card p-12 text-center bg-white/60">
                 <div className="w-16 h-16 clay-card rounded-2xl bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center mx-auto mb-4">
                   <MessageSquare className="w-8 h-8 text-white" />
                 </div>
-                <h3 className="clay-text-title text-xl font-semibold mb-2">No topics found</h3>
+                <h3 className="clay-text-title text-xl font-semibold mb-2">
+                  {searchTerm ? 'No topics found' : 'No topics yet'}
+                </h3>
                 <p className="clay-text-soft mb-6">
-                  {selectedCategory === 'all' 
-                    ? "Be the first to start a discussion in the community!"
-                    : `No topics found in this category. Start the conversation!`
+                  {searchTerm 
+                    ? `No topics match "${searchTerm}". Try different keywords.`
+                    : selectedCategory === 'all' 
+                      ? "Be the first to start a discussion in the community!"
+                      : `No topics found in this category. Start the conversation!`
                   }
                 </p>
-                {user && (
+                {user && !searchTerm && (
                   <button 
                     onClick={() => setShowCreateModal(true)}
                     className="clay-button-primary px-6 py-3 font-semibold text-white flex items-center gap-2 mx-auto"
@@ -525,9 +583,9 @@ const Forum = () => {
           </div>
 
           {/* Load More */}
-          {topics.length > 0 && (
+          {filteredTopics.length > 10 && (
             <div className="text-center mt-8">
-              <button className="clay-button px-8 py-3 font-semibold">
+              <button className="clay-button px-8 py-3 font-semibold hover:bg-white/80">
                 Load More Topics
               </button>
             </div>
