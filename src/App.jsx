@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import { ToastProvider } from './components/ui/Toast';
 
@@ -22,6 +22,21 @@ import Contact from './Pages/Contact';
 // Import layout
 import Layout from './Components/layout/layout.jsx';
 import LoadingSpinner from './components/ui/LoadingSpinner';
+import AuthDebug from './Pages/AuthDebug.jsx';
+
+// Wrapper component for UserProfile with routing integration
+const UserProfileWrapper = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  
+  return (
+    <UserProfile 
+      userId={id}
+      onBack={() => navigate(-1)}
+      onNavigate={(path) => navigate(path)}
+    />
+  );
+};
 
 const AppContent = () => {
   const { user, loading } = useAuth();
@@ -31,9 +46,8 @@ const AppContent = () => {
       <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-pink-50">
         <div className="text-center">
           <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center shadow-lg mb-4 mx-auto animate-pulse">
-  <img src="/logo.png" alt="Tamatas Logo" className="w-full h-full object-cover" />
-</div>
-
+            <img src="/logo.png" alt="Tamatas Logo" className="w-full h-full object-cover" />
+          </div>
           <div className="loading-spinner mx-auto mb-4"></div>
           <h2 className="text-xl font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent mb-2">
             Tamatas
@@ -56,7 +70,7 @@ const AppContent = () => {
           <Route path="/listing/:id" element={<ListingDetails />} />
           <Route path="/messages" element={user ? <Messages /> : <Navigate to="/" />} />
           <Route path="/profile" element={user ? <Profile /> : <Navigate to="/" />} />
-          <Route path="/user/:id" element={<UserProfile />} />
+          <Route path="/user/:id" element={<UserProfileWrapper />} />
           <Route path="/favorites" element={user ? <Favorites /> : <Navigate to="/" />} />
           <Route path="/feeds" element={<Feeds />} /> 
           <Route path="/forum" element={<Forum />} />
@@ -64,6 +78,9 @@ const AppContent = () => {
           <Route path="/forum/create" element={user ? <CreateForumTopic /> : <Navigate to="/" />} />
           <Route path="/contact" element={<Contact />} />
         </Routes>
+        
+        {/* Debug component for development */}
+        {/* {process.env.NODE_ENV === 'development' && <AuthDebug />} */}
       </Layout>
     </Router>
   );

@@ -263,18 +263,71 @@ async login(email, password) {
   return data;
 }
 
-  async register(userData) {
-    const data = await this.request(API_CONFIG.AUTH.REGISTER, {
+ // src/config/api.js - Updated register method (replace the existing one)
+
+async register(userData) {
+  console.log('🔐 API Client: Starting registration request');
+  console.log('🔐 API Client: Registration data:', userData);
+  
+  // Validate required fields before sending
+  const requiredFields = ['email', 'password', 'location'];
+  for (const field of requiredFields) {
+    if (!userData[field]) {
+      throw new Error(`${field} is required for registration`);
+    }
+  }
+  
+  // Validate location specifically
+  if (!userData.location.country || !userData.location.city) {
+    throw new Error('Country and city are required in location');
+  }
+  
+  try {
+    const response = await this.request(API_CONFIG.AUTH.REGISTER, {
       method: 'POST',
       body: JSON.stringify(userData),
     });
     
-    if (data.access_token) {
-      this.setToken(data.access_token);
+    console.log('🔐 API Client: Registration response:', response);
+    
+    // Set token if received
+    if (response.access_token) {
+      console.log('🔐 API Client: Setting token from registration...');
+      this.setToken(response.access_token);
+      
+      // Verify token was set
+      const tokenInStorage = localStorage.getItem('auth_token');
+      console.log('🔐 API Client: Token in storage after registration:', tokenInStorage ? 'SET' : 'MISSING');
+      
+      if (!tokenInStorage) {
+        console.error('❌ API Client: Failed to set token after registration');
+        throw new Error('Failed to store authentication token');
+      }
+    } else {
+      console.error('❌ API Client: No access_token in registration response');
+      throw new Error('No access token received from registration');
     }
     
-    return data;
+    console.log('✅ API Client: Registration completed successfully');
+    return response;
+    
+  } catch (error) {
+    console.error('❌ API Client: Registration failed:', error);
+    
+    // Handle specific backend validation errors
+    if (error.status === 400) {
+      if (error.message?.includes('Email already registered')) {
+        throw new Error('This email is already registered. Please try logging in instead.');
+      } else if (error.message?.includes('Location')) {
+        throw new Error('Please provide valid location information (country and city required)');
+      } else if (error.message?.includes('geocod')) {
+        throw new Error('Could not verify your location. Please check the spelling and try again.');
+      }
+    }
+    
+    throw error;
   }
+}
 
   async getCurrentUser() {
     return this.request(API_CONFIG.AUTH.ME);

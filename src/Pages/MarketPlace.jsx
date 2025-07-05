@@ -498,151 +498,7 @@ const MapView = ({ listings, onListingHover, onListingClick }) => {
       </div>
     </div>
   );
-};Level = calculateZoom(listingsWithCoords);
-
-  // Show debug info if no valid listings
-  if (listingsWithCoords.length === 0) {
-    return (
-      <div className="relative w-full h-96 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
-        <div className="text-center p-6 max-w-md">
-          <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <h3 className="text-lg font-semibold text-gray-600 mb-2">No locations to display</h3>
-          <p className="text-sm text-gray-500 mb-4">
-            Found {listings.length} listings but none have valid location data.
-          </p>
-          <div className="text-xs text-gray-400 text-left bg-gray-50 p-3 rounded">
-            <strong>Debug info:</strong><br/>
-            Looking for coordinates in: coordinates.lat/lng, latitude/longitude, lat/lng<br/>
-            Looking for cities in: location.city, city, address.city<br/>
-            <br/>
-            <strong>Your listings structure:</strong><br/>
-            {listings.length > 0 && (
-              <pre className="text-xs overflow-auto max-h-32">
-                {JSON.stringify(listings[0], null, 2)}
-              </pre>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative w-full h-96 rounded-lg overflow-hidden">
-      <MapContainer
-        center={mapCenter}
-        zoom={zoomLevel}
-        style={{ height: '100%', width: '100%' }}
-        className="z-0"
-      >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        />
-        
-        {listingsWithCoords.map((listing) => (
-          <Marker
-            key={listing.id}
-            position={[listing.lat, listing.lng]}
-            icon={createCustomIcon(listing)}
-            eventHandlers={{
-              mouseover: () => onListingHover?.(listing),
-              mouseout: () => onListingHover?.(null),
-              click: () => onListingClick?.(listing),
-            }}
-          >
-            <Popup>
-              <div className="w-64 p-2">
-                <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0">
-                    {listing.images && listing.images[0] ? (
-                      <img 
-                        src={listing.images[0]} 
-                        alt={listing.title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center">
-                        <Leaf className="w-6 h-6 text-white" />
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm text-gray-900 line-clamp-2 mb-1">
-                      {listing.title}
-                    </h3>
-                    <p className="text-xs text-gray-500 line-clamp-2 mb-2">
-                      {listing.description}
-                    </p>
-                    
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        listing.listing_type === 'for_sale' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {listing.listing_type === 'for_sale' ? 'For Sale' : 'Looking For'}
-                      </span>
-                      
-                      {listing.price && (
-                        <div className="text-right">
-                          <p className="font-bold text-sm text-green-600">${listing.price}</p>
-                          <p className="text-xs text-gray-500">{listing.price_unit?.replace('per_', '')}</p>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {listing.organic && (
-                      <div className="flex items-center gap-1 mb-2">
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
-                          <Leaf className="w-2 h-2" />
-                          Organic
-                        </span>
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
-                      <MapPin className="w-3 h-3" />
-                      <span className="truncate">
-                        {listing.location?.city || listing.city || 'Location not specified'}
-                      </span>
-                    </div>
-                    
-                    <button 
-                      onClick={() => onListingClick?.(listing)}
-                      className="w-full py-1 bg-gradient-to-r from-orange-400 to-red-400 text-white font-semibold text-xs rounded-lg"
-                    >
-                      View Details
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
-      
-      {/* Map Legend */}
-      <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-md p-3 z-10">
-        <h4 className="text-xs font-semibold text-gray-700 mb-2">Legend</h4>
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-green-500 rounded-full"></div>
-            <span className="text-xs text-gray-600">For Sale</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
-            <span className="text-xs text-gray-600">Looking For</span>
-          </div>
-        </div>
-      </div>
-      
-      {/* Dynamic Map Info */}
-      <div className="absolute top-4 left-4 bg-green-100 border border-green-300 rounded-lg p-2 text-xs text-green-800 max-w-xs z-10">
-        <strong>Real Data:</strong> Showing {listingsWithCoords.length} of {listings.length} listings with location data
-      </div>
-    </div>
-  );
- 
+};
 
 const Marketplace = () => {
   const { user } = useAuth();
@@ -679,8 +535,6 @@ const Marketplace = () => {
     { value: 'squash_pumpkins', label: 'Squash & Pumpkins' },
     { value: 'other', label: 'Other' }
   ];
-
-
 
   useEffect(() => {
     loadListings();
@@ -781,6 +635,8 @@ const Marketplace = () => {
 
     setFilteredListings(filtered);
   };
+
+  
 
   const toggleFavorite = async (listingId) => {
     if (!user) {

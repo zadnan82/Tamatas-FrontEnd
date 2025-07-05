@@ -1,3 +1,5 @@
+// src/Pages/HomePage.jsx - Updated registration with location support
+
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ui/Toast';
@@ -26,12 +28,33 @@ const HomePage = () => {
   const [formData, setFormData] = useState({ 
     email: '', 
     password: '', 
-    full_name: '' 
+    full_name: '',
+    // NEW: Location fields for registration
+    location: {
+      country: '',
+      city: '',
+      state: '',
+      area: ''
+    },
+    location_precision: 'city',
+    search_radius: 25,
+    // NEW: Contact preferences
+    whatsapp_number: '',
+    contact_preference: 'both',
+    show_whatsapp_on_listings: false
   });
   const [loading, setLoading] = useState(false);
+  const [registrationStep, setRegistrationStep] = useState(1); // 1: Basic info, 2: Location
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!isLogin && registrationStep === 1) {
+      // For registration, move to step 2 (location)
+      setRegistrationStep(2);
+      return;
+    }
+    
     setLoading(true);
     
     try {
@@ -39,13 +62,42 @@ const HomePage = () => {
         await login(formData.email, formData.password);
         toast.success('Welcome back to Tamatas!');
       } else {
-        await register(formData.email, formData.password, formData.full_name);
+        // Validate required location fields
+        if (!formData.location.country || !formData.location.city) {
+          toast.error('Please provide at least your country and city');
+          setLoading(false);
+          return;
+        }
+        
+        // Register with full data
+        await register(formData);
         toast.success('Welcome to Tamatas! Your account has been created.');
       }
     } catch (error) {
-      toast.error(error.message);
+      console.error('Auth error:', error);
+      toast.error(error.message || 'Authentication failed');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    
+    if (name.startsWith('location.')) {
+      const locationField = name.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        location: {
+          ...prev.location,
+          [locationField]: value
+        }
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      }));
     }
   };
 
@@ -53,8 +105,24 @@ const HomePage = () => {
     setFormData({ 
       email: 'farmer@example.com', 
       password: 'password123', 
-      full_name: '' 
+      full_name: '',
+      location: { country: '', city: '', state: '', area: '' },
+      location_precision: 'city',
+      search_radius: 25,
+      whatsapp_number: '',
+      contact_preference: 'both',
+      show_whatsapp_on_listings: false
     });
+    setIsLogin(true);
+    setRegistrationStep(1);
+  };
+
+  const resetRegistration = () => {
+    setRegistrationStep(1);
+    setFormData(prev => ({
+      ...prev,
+      location: { country: '', city: '', state: '', area: '' }
+    }));
   };
 
   const features = [
@@ -123,24 +191,20 @@ const HomePage = () => {
       <section className="container mx-auto px-4 py-12">
         {/* Hero Header */}
         <div className="text-center mb-12">
-         <div className="inline-flex items-center gap-4 mb-6">
-   
-  <div className="text-left">
-    <div className="flex justify-center mb-4">
-  <img 
-    src="/loggan.png" 
-    alt="Tamatas Logo" 
-    className="w-150 h-auto object-contain mx-auto" 
-  />
-</div>
-
-   <p className="text-sm text-gray-600 font-medium text-center mt-2">
-  Fresh Local Exchange
-</p>
-
-  </div>
-</div>
-
+          <div className="inline-flex items-center gap-4 mb-6">
+            <div className="text-left">
+              <div className="flex justify-center mb-4">
+                <img 
+                  src="/loggan.png" 
+                  alt="Tamatas Logo" 
+                  className="w-150 h-auto object-contain mx-auto" 
+                />
+              </div>
+              <p className="text-sm text-gray-600 font-medium text-center mt-2">
+                Fresh Local Exchange
+              </p>
+            </div>
+          </div>
           
           <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4 max-w-4xl mx-auto leading-tight">
             Connect with Local Farmers & Fresh Produce
@@ -182,57 +246,181 @@ const HomePage = () => {
           <Card gradient className="p-6">
             <div className="text-center mb-6">
               <h3 className="text-xl font-bold text-gray-900 mb-2">
-                {isLogin ? 'Welcome Back' : 'Join Tamatas'}
+                {isLogin ? 'Welcome Back' : 
+                  registrationStep === 1 ? 'Join Tamatas' : 'Your Location'}
               </h3>
               <p className="text-sm text-gray-600">
-                {isLogin ? 'Sign in to your account' : 'Create your account today'}
+                {isLogin ? 'Sign in to your account' : 
+                  registrationStep === 1 ? 'Create your account today' : 
+                  'Help us connect you with local farmers'}
               </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {!isLogin && (
-                <Input
-                  label="Full Name"
-                  value={formData.full_name}
-                  onChange={(e) => setFormData({...formData, full_name: e.target.value})}
-                  placeholder="Enter your full name"
-                  required={!isLogin}
-                />
+              {isLogin ? (
+                // LOGIN FORM
+                <>
+                  <Input
+                    label="Email"
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="Enter your email"
+                    required
+                  />
+                  
+                  <Input
+                    label="Password"
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="Enter your password"
+                    required
+                  />
+                </>
+              ) : registrationStep === 1 ? (
+                // REGISTRATION STEP 1: Basic Info
+                <>
+                  <Input
+                    label="Full Name"
+                    name="full_name"
+                    value={formData.full_name}
+                    onChange={handleChange}
+                    placeholder="Enter your full name"
+                    required
+                  />
+                  
+                  <Input
+                    label="Email"
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="Enter your email"
+                    required
+                  />
+                  
+                  <Input
+                    label="Password"
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="Create a password"
+                    required
+                  />
+                  
+                  <div className="pt-2">
+                    <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <MapPin className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                      <div className="text-sm text-blue-700">
+                        <p className="font-medium">Next: Set Your Location</p>
+                        <p className="text-xs">This helps you find local farmers near you</p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                // REGISTRATION STEP 2: Location
+                <>
+                  <Input
+                    label="Country *"
+                    name="location.country"
+                    value={formData.location.country}
+                    onChange={handleChange}
+                    placeholder="e.g., United States"
+                    required
+                  />
+                  
+                  <Input
+                    label="City *"
+                    name="location.city"
+                    value={formData.location.city}
+                    onChange={handleChange}
+                    placeholder="e.g., New York"
+                    required
+                  />
+                  
+                  <Input
+                    label="State/Province"
+                    name="location.state"
+                    value={formData.location.state}
+                    onChange={handleChange}
+                    placeholder="e.g., New York"
+                  />
+                  
+                  <Input
+                    label="Area/Neighborhood"
+                    name="location.area"
+                    value={formData.location.area}
+                    onChange={handleChange}
+                    placeholder="e.g., Manhattan (optional)"
+                  />
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-gray-700">
+                      Search Radius (miles)
+                    </label>
+                    <select
+                      name="search_radius"
+                      value={formData.search_radius}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    >
+                      <option value={5}>5 miles</option>
+                      <option value={10}>10 miles</option>
+                      <option value={25}>25 miles</option>
+                      <option value={50}>50 miles</option>
+                      <option value={100}>100 miles</option>
+                    </select>
+                  </div>
+                  
+                  <div className="pt-2">
+                    <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <Shield className="w-4 h-4 text-green-600 flex-shrink-0" />
+                      <div className="text-sm text-green-700">
+                        <p className="font-medium">Privacy Protected</p>
+                        <p className="text-xs">Your exact location is never shared publicly</p>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
               
-              <Input
-                label="Email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
-                placeholder="Enter your email"
-                required
-              />
-              
-              <Input
-                label="Password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({...formData, password: e.target.value})}
-                placeholder="Enter your password"
-                required
-              />
-              
-              <Button 
-                type="submit" 
-                variant="primary"
-                size="lg"
-                fullWidth
-                loading={loading}
-                icon={<ArrowRight />}
-              >
-                {isLogin ? 'Sign In' : 'Create Account'}
-              </Button>
+              <div className="flex gap-2">
+                {!isLogin && registrationStep === 2 && (
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={resetRegistration}
+                    className="flex-1"
+                  >
+                    Back
+                  </Button>
+                )}
+                
+                <Button 
+                  type="submit" 
+                  variant="primary"
+                  size="lg"
+                  className="flex-1"
+                  loading={loading}
+                  icon={<ArrowRight />}
+                >
+                  {isLogin ? 'Sign In' : 
+                    registrationStep === 1 ? 'Continue' : 'Create Account'}
+                </Button>
+              </div>
             </form>
             
             <div className="text-center mt-6">
               <button
-                onClick={() => setIsLogin(!isLogin)}
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  setRegistrationStep(1);
+                }}
                 className="text-sm text-gray-600 hover:text-orange-600 font-medium transition-colors"
               >
                 {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
@@ -291,7 +479,10 @@ const HomePage = () => {
             <Button 
               variant="primary"
               size="lg"
-              onClick={() => setIsLogin(false)}
+              onClick={() => {
+                setIsLogin(false);
+                setRegistrationStep(1);
+              }}
               icon={<ArrowRight />}
             >
               Get Started Free
@@ -311,10 +502,9 @@ const HomePage = () => {
         <Card className="p-6 bg-white/60">
           <div className="text-center">
             <div className="flex items-center justify-center gap-3 mb-4">
-             <div className="w-12 h-12 rounded-2xl overflow-hidden flex items-center justify-center shadow-lg">
-  <img src="/logo.png" alt="Tamatas Logo" className="w-full h-full object-cover" />
-</div>
-
+              <div className="w-12 h-12 rounded-2xl overflow-hidden flex items-center justify-center shadow-lg">
+                <img src="/logo.png" alt="Tamatas Logo" className="w-full h-full object-cover" />
+              </div>
               <span className="text-lg font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
                 Tamatas
               </span>

@@ -1,3 +1,5 @@
+// src/hooks/useAuth.jsx - Updated with location support
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { apiClient } from '../config/api';
 
@@ -84,20 +86,45 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (email, password, full_name) => {
+  const register = async (registrationData) => {
     try {
-      console.log('🔐 Starting registration for:', email);
+      console.log('🔐 Starting registration for:', registrationData.email);
+      console.log('🔐 Registration data:', registrationData);
       
-      const response = await apiClient.register({
-        email,
-        password,
-        full_name,
-        bio: '',
-        phone: '',
-        address: '',
-        profile_image: ''
-      });
+      // Validate required fields
+      if (!registrationData.location?.country || !registrationData.location?.city) {
+        throw new Error('Location (country and city) is required for registration');
+      }
       
+      // Prepare registration payload according to backend schema
+      const payload = {
+        email: registrationData.email,
+        password: registrationData.password,
+        full_name: registrationData.full_name || '',
+        bio: registrationData.bio || '',
+        phone: registrationData.phone || '',
+        address: registrationData.address || '',
+        profile_image: registrationData.profile_image || '',
+        
+        // MANDATORY: Location fields
+        location: {
+          country: registrationData.location.country,
+          city: registrationData.location.city,
+          state: registrationData.location.state || '',
+          area: registrationData.location.area || ''
+        },
+        location_precision: registrationData.location_precision || 'city',
+        search_radius: registrationData.search_radius || 25,
+        
+        // OPTIONAL: Contact preferences
+        whatsapp_number: registrationData.whatsapp_number || '',
+        contact_preference: registrationData.contact_preference || 'both',
+        show_whatsapp_on_listings: registrationData.show_whatsapp_on_listings || false
+      };
+      
+      console.log('🔐 Sending registration payload:', payload);
+      
+      const response = await apiClient.register(payload);
       console.log('🔐 Registration response:', response);
       
       // Check if token was set during registration
@@ -121,6 +148,16 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('auth_token');
       apiClient.setToken(null);
       setUser(null);
+      
+      // Provide more specific error messages
+      if (error.message.includes('Location')) {
+        throw new Error('Please provide your location (country and city) to complete registration');
+      } else if (error.message.includes('Email already registered')) {
+        throw new Error('This email is already registered. Please try logging in instead.');
+      } else if (error.message.includes('geocod')) {
+        throw new Error('Could not verify your location. Please check your spelling and try again.');
+      }
+      
       throw error;
     }
   };
@@ -152,6 +189,7 @@ export const AuthProvider = ({ children }) => {
     console.log('localStorage token:', localStorage.getItem('auth_token'));
     console.log('apiClient token:', apiClient.token);
     console.log('isAuthenticated:', !!user);
+    console.log('User location:', user?.location);
     console.log('==================');
   };
 
@@ -167,7 +205,9 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated: !!user,
     userId: user?.id,
     userEmail: user?.email,
-    userName: user?.full_name || user?.email?.split('@')[0] || 'User'
+    userName: user?.full_name || user?.email?.split('@')[0] || 'User',
+    userLocation: user?.location,
+    hasLocation: !!(user?.latitude && user?.longitude)
   };
 
   return (
