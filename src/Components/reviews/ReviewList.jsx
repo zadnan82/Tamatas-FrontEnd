@@ -1,14 +1,20 @@
 import React from 'react'; 
 import Card, { CardContent } from '../ui/Card';
-import { Avatar, AvatarFallback} from '../../components/ui/avatar';
+import { Avatar, AvatarFallback } from '../../components/ui/avatar';
 import StarRating from '../shared/StarRating';
 import { format } from 'date-fns';
 
-export default function ReviewList({ reviews }) {
+export default function ReviewList({ reviews, onAddReview }) {
   if (reviews.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
-        <p>No reviews yet. Be the first to leave one!</p>
+        <p>No reviews yet.</p>
+        <button 
+          onClick={onAddReview}
+          className="mt-2 text-orange-600 hover:text-orange-700 font-medium"
+        >
+          Be the first to leave one!
+        </button>
       </div>
     );
   }
@@ -21,13 +27,13 @@ export default function ReviewList({ reviews }) {
             <div className="flex items-start gap-4">
               <Avatar>
                 <AvatarFallback>
-                  {review.created_by?.charAt(0)?.toUpperCase() || 'U'}
+                  {review.is_anonymous ? 'A' : review.reviewer?.full_name?.charAt(0)?.toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
                   <p className="font-semibold">
-                    {review.created_by?.split('@')[0] || 'Anonymous User'}
+                    {review.is_anonymous ? 'Anonymous' : review.reviewer?.full_name || review.reviewer?.email?.split('@')[0] || 'User'}
                   </p>
                   <StarRating rating={review.rating} readonly />
                   <span className="text-sm text-gray-500">

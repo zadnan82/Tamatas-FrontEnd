@@ -20,11 +20,15 @@ import {
   Clock,
   Eye
 } from 'lucide-react';
+import { Pencil } from 'lucide-react';
+import ReviewForm from '../components/reviews/ReviewForm';
+import ReviewList from '../components/reviews/ReviewList';
+
 
 const UserProfile = ({ userId, onBack, onNavigate }) => {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
-  
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const [profile, setProfile] = useState(null);
   const [userListings, setUserListings] = useState([]);
   const [userReviews, setUserReviews] = useState([]);
@@ -38,6 +42,9 @@ const UserProfile = ({ userId, onBack, onNavigate }) => {
     memberSince: null,
     lastActive: null
   });
+ const [reviewsLoading, setReviewsLoading] = useState(false);
+const [showReviewForm, setShowReviewForm] = useState(false);
+const [selectedListingForReview, setSelectedListingForReview] = useState(null);
 
   useEffect(() => {
     if (userId) {
@@ -65,45 +72,78 @@ const UserProfile = ({ userId, onBack, onNavigate }) => {
     return `${diffInYears}y ago`;
   };
 
-  const loadUserProfile = async () => {
-    try {
-      setLoading(true);
-      
-      // Load user profile, listings, and reviews in parallel
-      const [profileData, listings, reviews] = await Promise.all([
-        apiClient.getUserProfile(userId),
-        apiClient.getListings({ created_by: userId }).catch(() => []),
-        apiClient.getUserReviews(userId).catch(() => [])
-      ]);
-      
-      setProfile(profileData);
-      setUserListings(listings);
-      setUserReviews(reviews);
-      
-      // Calculate stats
-      const activeListings = listings.filter(l => l.status === 'active');
-      const avgRating = reviews.length > 0 
-        ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
-        : 0;
-      
-      setStats({
-        totalListings: listings.length,
-        activeListings: activeListings.length,
-        totalReviews: reviews.length,
-        averageRating: avgRating,
-        memberSince: profileData.created_date,
-        lastActive: profileData.updated_date || profileData.created_date
-      });
-      
-    } catch (error) {
-      console.error('Error loading user profile:', error);
-      toast.error('Failed to load user profile');
-      if (onBack) onBack();
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+  if (userId) {
+    loadUserProfile();
+  }
+}, [userId]);
+const LoadingSpinner = () => (
+  <div className="w-12 h-12 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin mx-auto mb-6"></div>
+);
+const loadUserProfile = async () => {
+  try {
+    setLoading(true);
+    setReviewsLoading(true);
+    
+    const [profileData, listings, reviews] = await Promise.all([
+      apiClient.getUserProfile(userId),
+      apiClient.getListings({ created_by: userId }).catch(() => []),
+      // MODIFY THIS LINE - remove the conditional include_anonymous check
+      apiClient.getUserReviews(userId).catch(() => [])
+      // OR if you want to keep some control:
+      // apiClient.getUserReviews(userId, { include_anonymous: true }).catch(() => [])
+    ]);
+    
+    console.log('Reviews data:', reviews); // This will now show all reviews
+    
+    setProfile(profileData);
+    setUserListings(listings);
+    setUserReviews(reviews);
+    
+    // Rest of your function remains the same...
+    const activeListings = listings.filter(l => l.status === 'active');
+    const avgRating = reviews.length > 0 
+      ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
+      : 0;
+    
+    setStats({
+      totalListings: listings.length,
+      activeListings: activeListings.length,
+      totalReviews: reviews.length,
+      averageRating: avgRating,
+      memberSince: profileData.created_date,
+      lastActive: profileData.updated_date || profileData.created_date
+    });
+    
+  } catch (error) {
+    console.error('Error loading user profile:', error);
+    toast.error('Failed to load user profile');
+    if (onBack) onBack();
+  } finally {
+    setLoading(false);
+    setReviewsLoading(false); // Don't forget this!
+  }
+};
+const loadReviews = async (retries = 3) => {
+  try {
+    const reviews = await apiClient.getUserReviews(userId, {
+      include_anonymous: currentUser?.id === userId
+    });
+    setUserReviews(reviews);
+  } catch (error) {
+    if (retries > 0) {
+      setTimeout(() => loadReviews(retries - 1), 1000);
+    } else {
+      toast.error('Failed to load reviews');
+      setUserReviews([]);
     }
-  };
+  }
+};
 
+  const handleReviewSubmitted = (reviewData) => {
+  setShowReviewForm(false);
+  loadUserProfile(); // Refresh the profile to show the new review
+};
   const handleMessageUser = () => {
     if (!currentUser) {
       toast.error('Please log in to send messages');
@@ -171,7 +211,32 @@ const UserProfile = ({ userId, onBack, onNavigate }) => {
       )}
     </button>
   );
-
+const AnonymousToggle = () => (
+  <div className="flex items-center gap-2 mb-4">
+    <label 
+      htmlFor="anonymous-toggle"
+      className="text-sm font-medium text-gray-700"
+    >
+      Post as anonymous
+    </label>
+    <div className="relative inline-block w-10 mr-2 align-middle select-none">
+      <input 
+        type="checkbox" 
+        id="anonymous-toggle"
+        checked={isAnonymous}
+        onChange={() => setIsAnonymous(!isAnonymous)}
+        className="sr-only"
+      />
+      <div className={`block w-10 h-6 rounded-full ${isAnonymous ? 'bg-orange-500' : 'bg-gray-300'}`}></div>
+      <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${isAnonymous ? 'transform translate-x-4' : ''}`}></div>
+    </div>
+    {isAnonymous && (
+      <span className="text-xs text-gray-500">
+        Your name won't be shown
+      </span>
+    )}
+  </div>
+);
   const ListingCard = ({ listing }) => (
     <div 
       onClick={() => onNavigate && onNavigate(`/listing/${listing.id}`)}
@@ -232,7 +297,8 @@ const UserProfile = ({ userId, onBack, onNavigate }) => {
     </div>
   );
 
-  const ReviewCard = ({ review }) => (
+  const ReviewCard = ({ review }) => {
+  return (
     <div className="clay-card p-4 bg-white">
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center flex-shrink-0">
@@ -241,7 +307,9 @@ const UserProfile = ({ userId, onBack, onNavigate }) => {
         
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
-            <span className="font-medium text-gray-900">{review.reviewer?.full_name || 'Anonymous'}</span>
+            <span className="font-medium text-gray-900">
+              {review.is_anonymous ? 'Anonymous' : (review.reviewer?.full_name || 'User')}
+            </span>
             <div className="flex items-center gap-1">
               {[...Array(5)].map((_, i) => (
                 <Star 
@@ -260,33 +328,22 @@ const UserProfile = ({ userId, onBack, onNavigate }) => {
           {review.comment && (
             <p className="text-sm text-gray-700 mb-2">{review.comment}</p>
           )}
-          
-          <div className="flex items-center gap-4 text-xs text-gray-500">
-            {review.product_quality && (
-              <span>Product: {review.product_quality}/5</span>
-            )}
-            {review.communication && (
-              <span>Communication: {review.communication}/5</span>
-            )}
-            {review.delivery && (
-              <span>Delivery: {review.delivery}/5</span>
-            )}
-          </div>
         </div>
       </div>
     </div>
   );
+};
 
-  if (loading) {
-    return (
-      <div className="max-w-6xl mx-auto p-4">
-        <div className="clay-card p-12 text-center bg-white">
-          <div className="w-12 h-12 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin mx-auto mb-6"></div>
-          <p className="text-gray-600 text-xl font-semibold">Loading user profile...</p>
-        </div>
+ if (loading) {
+  return (
+    <div className="max-w-6xl mx-auto p-4">
+      <div className="clay-card p-12 text-center bg-white">
+        <LoadingSpinner />
+        <p className="text-gray-600 text-xl font-semibold">Loading user profile...</p>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   if (!profile) {
     return (
@@ -401,6 +458,15 @@ const UserProfile = ({ userId, onBack, onNavigate }) => {
                   WhatsApp
                 </Button>
               )}
+
+               <Button
+      variant="outline"
+      onClick={() => setShowReviewForm(true)}
+      icon={<Pencil className="w-4 h-4" />}
+      className="w-full md:w-auto"
+    >
+      Leave Review
+    </Button>
             </div>
           )}
         </div>
@@ -464,6 +530,7 @@ const UserProfile = ({ userId, onBack, onNavigate }) => {
               isActive={activeTab === 'reviews'}
               onClick={setActiveTab}
             />
+            
           </div>
         </div>
         
@@ -490,24 +557,48 @@ const UserProfile = ({ userId, onBack, onNavigate }) => {
             </div>
           )}
 
-          {/* Reviews Tab */}
-          {activeTab === 'reviews' && (
-            <div>
-              {userReviews.length > 0 ? (
-                <div className="space-y-4">
-                  {userReviews.map(review => (
-                    <ReviewCard key={review.id} review={review} />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <Star className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">No Reviews Yet</h3>
-                  <p className="text-gray-600">This user hasn't received any reviews yet.</p>
-                </div>
-              )}
-            </div>
-          )}
+            
+{activeTab === 'reviews' && (
+  <div className="space-y-6">
+    {reviewsLoading ? (
+  <div className="text-center py-8">
+    <LoadingSpinner />
+    <p className="text-gray-600">Loading reviews...</p>
+  </div>
+    ) : (
+      <>
+        {showReviewForm ? (
+          <ReviewForm
+            reviewedUserId={userId}
+            listingId={selectedListingForReview}
+            onReviewSubmitted={() => {
+              setShowReviewForm(false);
+              loadUserProfile();
+            }}
+            onCancel={() => setShowReviewForm(false)}
+          />
+        ) : (
+          <>
+            <ReviewList 
+              reviews={userReviews} 
+              onAddReview={() => setShowReviewForm(true)}
+            />
+            {currentUser && currentUser.id !== userId && (
+              <div className="text-center">
+                <Button
+                  onClick={() => setShowReviewForm(true)}
+                  icon={<Pencil className="w-4 h-4" />}
+                >
+                  Write a Review
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </>
+    )}
+  </div>
+)}
         </div>
       </div>
 
