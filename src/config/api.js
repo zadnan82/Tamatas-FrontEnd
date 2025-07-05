@@ -488,10 +488,16 @@ class ApiClient {
     return this.request(API_CONFIG.USERS.PROFILE(userId));
   }
 
-  async getUserReviews(userId) {
-    console.log('⭐ Getting reviews for user:', userId);
-    return this.request(API_CONFIG.USERS.REVIEWS(userId));
-  }
+  async getUserReviews(userId, options = {}) {
+  console.log('⭐ Getting reviews for user:', userId);
+  if (!userId) throw new Error('User ID is required');
+  
+  // Use the correct endpoint - this should match your backend route
+  return this.request(`/reviews/user/${userId}`, {
+    method: 'GET',
+    skipCache: options.forceRefresh || false
+  });
+}
 
   async exportUserData() {
     console.log('📤 Exporting user data (GDPR)...');
@@ -641,6 +647,82 @@ class ApiClient {
     console.log('📊 Getting marketplace statistics...');
     return this.request(API_CONFIG.LISTINGS.STATS_OVERVIEW);
   }
+
+  // Add these methods to your ApiClient class in src/config/api.js
+// Find the forum section and add these methods:
+
+async updateForumPost(postId, updateData) {
+  console.log('📝 Updating forum post:', postId);
+  
+  if (!postId) throw new Error('Post ID is required');
+  if (!updateData.content || !updateData.content.trim()) {
+    throw new Error('Post content is required');
+  }
+
+  return this.request(`/forum/posts/${postId}`, {
+    method: 'PUT',
+    body: updateData,
+    skipCache: true,
+    skipDuplicateCheck: true
+  });
+}
+
+async deleteForumPost(postId) {
+  console.log('🗑️ Deleting forum post:', postId);
+  
+  if (!postId) throw new Error('Post ID is required');
+
+  return this.request(`/forum/posts/${postId}`, {
+    method: 'DELETE',
+    skipCache: true,
+    skipDuplicateCheck: true
+  });
+}
+
+async reportForumPost(postId, reason) {
+  console.log('🚨 Reporting forum post:', postId);
+  
+  if (!postId) throw new Error('Post ID is required');
+  if (!reason || !reason.trim()) throw new Error('Report reason is required');
+
+  return this.request(`/forum/posts/${postId}/report`, {
+    method: 'POST',
+    body: { reason: reason.trim() },
+    skipCache: true,
+    skipDuplicateCheck: true
+  });
+}
+
+// Add these methods to your ApiClient class in src/config/api.js
+// Find the forum section and add these methods:
+
+async updateForumTopic(topicId, updateData) {
+  console.log('📝 Updating forum topic:', topicId);
+  
+  if (!topicId) throw new Error('Topic ID is required');
+  if (!updateData.title && !updateData.content) {
+    throw new Error('Either title or content must be provided');
+  }
+
+  return this.request(`/forum/topics/${topicId}`, {
+    method: 'PUT',
+    body: updateData,
+    skipCache: true,
+    skipDuplicateCheck: true
+  });
+}
+
+async deleteForumTopic(topicId) {
+  console.log('🗑️ Deleting forum topic:', topicId);
+  
+  if (!topicId) throw new Error('Topic ID is required');
+
+  return this.request(`/forum/topics/${topicId}`, {
+    method: 'DELETE',
+    skipCache: true,
+    skipDuplicateCheck: true
+  });
+}
 
   // ==================== MESSAGE METHODS ====================
 
@@ -1283,6 +1365,11 @@ class ApiClient {
     console.log('✅ API client reset complete');
   }
 
+  async getUserReviewsList(userId) {
+  console.log('⭐ Getting reviews for user (alternative method):', userId);
+  if (!userId) throw new Error('User ID is required');
+  return this.request(`/reviews/user/${userId}`);
+}
   // Get full API client statistics
   getFullStats() {
     return {

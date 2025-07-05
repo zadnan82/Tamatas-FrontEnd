@@ -80,27 +80,40 @@ const [selectedListingForReview, setSelectedListingForReview] = useState(null);
 const LoadingSpinner = () => (
   <div className="w-12 h-12 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin mx-auto mb-6"></div>
 );
+ 
 const loadUserProfile = async () => {
   try {
     setLoading(true);
     setReviewsLoading(true);
     
+    console.log('Loading profile for userId:', userId);
+    
     const [profileData, listings, reviews] = await Promise.all([
       apiClient.getUserProfile(userId),
       apiClient.getListings({ created_by: userId }).catch(() => []),
-      // MODIFY THIS LINE - remove the conditional include_anonymous check
-      apiClient.getUserReviews(userId).catch(() => [])
-      // OR if you want to keep some control:
-      // apiClient.getUserReviews(userId, { include_anonymous: true }).catch(() => [])
+      // Try multiple approaches for reviews
+      apiClient.getUserReviews(userId, { forceRefresh: true }).catch(async (error) => {
+        console.warn('Primary reviews fetch failed, trying alternative:', error);
+        try {
+          // Try the alternative endpoint
+          return await apiClient.request(`/reviews/user/${userId}`);
+        } catch (altError) {
+          console.error('Alternative reviews fetch also failed:', altError);
+          return [];
+        }
+      })
     ]);
     
-    console.log('Reviews data:', reviews); // This will now show all reviews
+    console.log('Profile data:', profileData);
+    console.log('Listings data:', listings);
+    console.log('Reviews data:', reviews);
+    console.log('Reviews count:', reviews.length);
     
     setProfile(profileData);
     setUserListings(listings);
     setUserReviews(reviews);
     
-    // Rest of your function remains the same...
+    // Calculate stats
     const activeListings = listings.filter(l => l.status === 'active');
     const avgRating = reviews.length > 0 
       ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
@@ -121,9 +134,87 @@ const loadUserProfile = async () => {
     if (onBack) onBack();
   } finally {
     setLoading(false);
-    setReviewsLoading(false); // Don't forget this!
+    setReviewsLoading(false);
   }
 };
+
+// Also add a debug function you can call from console
+const debugReviews = async () => {
+  console.log('=== DEBUGGING REVIEWS ===');
+  
+  try {
+    // Test 1: Direct API call
+    console.log('Test 1: Direct API call...');
+    const response = await fetch(`http://localhost:8001/reviews/user/${userId}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    console.log('Response status:', response.status);
+    const data = await response.json();
+    console.log('Direct response:', data);
+    
+    // Test 2: Via API client
+    console.log('Test 2: Via API client...');
+    const clientData = await apiClient.getUserReviews(userId);
+    console.log('API client response:', clientData);
+    
+    // Test 3: Check cache
+    console.log('Test 3: Cache status...');
+    console.log(apiClient.getCacheStats());
+    
+  } catch (error) {
+    console.error('Debug failed:', error);
+  }
+};
+
+// Make debug function available globally
+if (typeof window !== 'undefined') {
+  window.debugReviews = debugReviews;
+} 
+
+// Add this debugging function to your UserProfile.jsx to test the endpoint directly
+
+const debugReviewsEndpoint = async () => {
+  console.log('=== DEBUG REVIEWS ENDPOINT ===');
+  console.log('User ID:', userId);
+  console.log('Current user ID:', currentUser?.id);
+  
+  try {
+    // Test direct API call
+    console.log('Testing direct API call...');
+    const response = await fetch(`http://localhost:8001/reviews/user/${userId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+      }
+    });
+    
+    console.log('Response status:', response.status);
+    console.log('Response ok:', response.ok);
+    
+    const data = await response.json();
+    console.log('Response data:', data);
+    console.log('Data type:', typeof data);
+    console.log('Is array:', Array.isArray(data));
+    console.log('Length:', data.length);
+    
+    if (data.length > 0) {
+      console.log('First review:', data[0]);
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Debug API call failed:', error);
+  }
+  
+  console.log('=== END DEBUG ===');
+};
+
+// Call this in your useEffect for debugging:
+ debugReviewsEndpoint();
 const loadReviews = async (retries = 3) => {
   try {
     const reviews = await apiClient.getUserReviews(userId, {
@@ -139,7 +230,20 @@ const loadReviews = async (retries = 3) => {
     }
   }
 };
-
+const handleLeaveReview = () => {
+  // Switch to reviews tab first
+  setActiveTab('reviews');
+  // Then show the review form
+  setShowReviewForm(true);
+  
+  // Optional: Scroll to the reviews section
+  setTimeout(() => {
+    const reviewsSection = document.querySelector('[data-reviews-section]');
+    if (reviewsSection) {
+      reviewsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, 100);
+};
   const handleReviewSubmitted = (reviewData) => {
   setShowReviewForm(false);
   loadUserProfile(); // Refresh the profile to show the new review
@@ -460,13 +564,13 @@ const AnonymousToggle = () => (
               )}
 
                <Button
-      variant="outline"
-      onClick={() => setShowReviewForm(true)}
-      icon={<Pencil className="w-4 h-4" />}
-      className="w-full md:w-auto"
-    >
-      Leave Review
-    </Button>
+  variant="outline"
+  onClick={handleLeaveReview}  // Changed from setShowReviewForm(true)
+  icon={<Pencil className="w-4 h-4" />}
+  className="w-full md:w-auto"
+>
+  Leave Review
+</Button>
             </div>
           )}
         </div>
@@ -559,12 +663,12 @@ const AnonymousToggle = () => (
 
             
 {activeTab === 'reviews' && (
-  <div className="space-y-6">
+  <div data-reviews-section className="space-y-6">  {/* Added data attribute */}
     {reviewsLoading ? (
-  <div className="text-center py-8">
-    <LoadingSpinner />
-    <p className="text-gray-600">Loading reviews...</p>
-  </div>
+      <div className="text-center py-8">
+        <LoadingSpinner />
+        <p className="text-gray-600">Loading reviews...</p>
+      </div>
     ) : (
       <>
         {showReviewForm ? (
@@ -581,12 +685,12 @@ const AnonymousToggle = () => (
           <>
             <ReviewList 
               reviews={userReviews} 
-              onAddReview={() => setShowReviewForm(true)}
+              onAddReview={handleLeaveReview}  // Changed from setShowReviewForm(true)
             />
             {currentUser && currentUser.id !== userId && (
               <div className="text-center">
                 <Button
-                  onClick={() => setShowReviewForm(true)}
+                  onClick={handleLeaveReview}  // Changed from setShowReviewForm(true)
                   icon={<Pencil className="w-4 h-4" />}
                 >
                   Write a Review

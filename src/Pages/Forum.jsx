@@ -39,73 +39,87 @@ const Forum = () => {
     loadForumData();
   }, [selectedCategory, sortBy]);
 
-  const loadForumData = async () => {
-    try {
-      setLoading(true);
-      
-      // Load categories
-      const fixedCategories = [
-        { 
-          id: 'all', 
-          name: 'All Discussions', 
-          icon: MessageSquare, 
-          color: 'from-gray-400 to-gray-500',
-          count: 0,
-          description: 'View all forum topics'
-        },
-        { 
-          id: 'gardening_tips', 
-          name: 'Gardening Tips', 
-          icon: Leaf, 
-          color: 'from-green-400 to-emerald-500',
-          count: 0,
-          description: 'Share gardening knowledge and techniques'
-        },
-        { 
-          id: 'trading_ideas', 
-          name: 'Trading Ideas', 
-          icon: TrendingUp, 
-          color: 'from-blue-400 to-cyan-500',
-          count: 0,
-          description: 'Discuss trading strategies and opportunities'
-        },
-        { 
-          id: 'general_discussion', 
-          name: 'General Discussion', 
-          icon: Users, 
-          color: 'from-purple-400 to-violet-500',
-          count: 0,
-          description: 'Community chat and general topics'
-        },
-        { 
-          id: 'site_feedback', 
-          name: 'Site Feedback', 
-          icon: HelpCircle, 
-          color: 'from-orange-400 to-red-500',
-          count: 0,
-          description: 'Suggestions and platform feedback'
-        }
-      ];
-
-      // Load topics from API
-      const filters = {};
-      if (selectedCategory !== 'all') {
-        filters.category = selectedCategory;
+ const loadForumData = async (forceRefresh = false) => {
+  try {
+    setLoading(true);
+    
+    // If forcing refresh, clear the cache first
+    if (forceRefresh) {
+      apiClient.invalidateCache('/forum/topics');
+    }
+    
+    // Load categories (keep as is)
+    const fixedCategories = [
+      { 
+        id: 'all', 
+        name: 'All Discussions', 
+        icon: MessageSquare, 
+        color: 'from-gray-400 to-gray-500',
+        count: 0,
+        description: 'View all forum topics'
+      },
+      { 
+        id: 'gardening_tips', 
+        name: 'Gardening Tips', 
+        icon: Leaf, 
+        color: 'from-green-400 to-emerald-500',
+        count: 0,
+        description: 'Share gardening knowledge and techniques'
+      },
+      { 
+        id: 'trading_ideas', 
+        name: 'Trading Ideas', 
+        icon: TrendingUp, 
+        color: 'from-blue-400 to-cyan-500',
+        count: 0,
+        description: 'Discuss trading strategies and opportunities'
+      },
+      { 
+        id: 'general_discussion', 
+        name: 'General Discussion', 
+        icon: Users, 
+        color: 'from-purple-400 to-violet-500',
+        count: 0,
+        description: 'Community chat and general topics'
+      },
+      { 
+        id: 'site_feedback', 
+        name: 'Site Feedback', 
+        icon: HelpCircle, 
+        color: 'from-orange-400 to-red-500',
+        count: 0,
+        description: 'Suggestions and platform feedback'
       }
-      
-      const apiTopics = await apiClient.getForumTopics(filters);
-      
-      // Update category counts
-      const updatedCategories = fixedCategories.map(cat => {
-        if (cat.id === 'all') {
-          return { ...cat, count: apiTopics.length };
-        }
-        const count = apiTopics.filter(t => t.category === cat.id).length;
-        return { ...cat, count };
-      });
+    ];
 
-      // Process topics for UI
-      const processedTopics = apiTopics.map(topic => ({
+    // Load topics from API with force refresh option
+    const filters = {};
+    if (selectedCategory !== 'all') {
+      filters.category = selectedCategory;
+    }
+    
+    // Add timestamp to force cache bypass if needed
+    if (forceRefresh) {
+      filters._refresh = Date.now();
+    }
+    
+    console.log('🔄 Loading forum topics with filters:', filters);
+    const apiTopics = await apiClient.getForumTopics(filters);
+    console.log('🔄 Received topics from API:', apiTopics);
+    
+    // Update category counts
+    const updatedCategories = fixedCategories.map(cat => {
+      if (cat.id === 'all') {
+        return { ...cat, count: apiTopics.length };
+      }
+      const count = apiTopics.filter(t => t.category === cat.id).length;
+      return { ...cat, count };
+    });
+
+    // Process topics for UI - FIXED to use real like data
+    const processedTopics = apiTopics.map(topic => {
+      console.log('🔄 Processing topic:', topic.title, 'likes:', topic.like_count);
+      return {
         id: topic.id,
         title: topic.title,
         content: topic.content || '',
@@ -120,47 +134,93 @@ const Forum = () => {
         isPinned: topic.is_pinned || false,
         isLocked: topic.is_locked || false,
         replies: topic.post_count || 0,
-        views: topic.view_count || Math.floor(Math.random() * 100) + 10,
-        likes: Math.floor(Math.random() * 20) + 1, // Placeholder
+        views: topic.view_count || 0,
+        likes: topic.like_count || 0, // REAL DATA from backend
+        userLiked: topic.user_liked || false, // REAL DATA from backend
         lastActivity: new Date(topic.updated_date || topic.created_date),
         createdDate: new Date(topic.created_date),
         lastReply: {
           author: 'Recent User', // Placeholder
           timestamp: new Date(topic.updated_date || topic.created_date)
         },
-        isNew: (new Date() - new Date(topic.created_date)) < 24 * 60 * 60 * 1000, // Less than 24 hours old
-        isHot: (topic.post_count || 0) > 5 && (topic.view_count || 0) > 50 // Popular topics
-      }));
+        isNew: (new Date() - new Date(topic.created_date)) < 24 * 60 * 60 * 1000,
+        isHot: (topic.post_count || 0) > 5 && (topic.view_count || 0) > 50
+      };
+    });
 
-      // Sort topics
-      processedTopics.sort((a, b) => {
-        // Always put pinned topics first
-        if (a.isPinned && !b.isPinned) return -1;
-        if (!a.isPinned && b.isPinned) return 1;
-        
-        switch (sortBy) {
-          case 'recent':
-            return new Date(b.lastActivity) - new Date(a.lastActivity);
-          case 'popular':
-            return (b.likes + b.replies + b.views) - (a.likes + a.replies + a.views);
-          case 'views':
-            return b.views - a.views;
-          case 'replies':
-            return b.replies - a.replies;
-          default:
-            return new Date(b.lastActivity) - new Date(a.lastActivity);
-        }
-      });
+    // Sort topics
+    processedTopics.sort((a, b) => {
+      // Always put pinned topics first
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      
+      switch (sortBy) {
+        case 'recent':
+          return new Date(b.lastActivity) - new Date(a.lastActivity);
+        case 'popular':
+          return (b.likes + b.replies + b.views) - (a.likes + a.replies + a.views);
+        case 'views':
+          return b.views - a.views;
+        case 'replies':
+          return b.replies - a.replies;
+        default:
+          return new Date(b.lastActivity) - new Date(a.lastActivity);
+      }
+    });
 
-      setCategories(updatedCategories);
-      setTopics(processedTopics);
-    } catch (error) {
-      console.error('Error loading forum data:', error);
-      toast.error('Failed to load forum data');
-    } finally {
-      setLoading(false);
-    }
-  };
+    console.log('🔄 Final processed topics:', processedTopics.map(t => ({ id: t.id, title: t.title, likes: t.likes, userLiked: t.userLiked })));
+
+    setCategories(updatedCategories);
+    setTopics(processedTopics);
+  } catch (error) {
+    console.error('Error loading forum data:', error);
+    toast.error('Failed to load forum data');
+  } finally {
+    setLoading(false);
+  }
+};
+
+  
+const handleLikeTopic = async (topicId) => {
+  if (!user) {
+    toast.error('Please log in to like topics');
+    return;
+  }
+
+  try {
+    console.log('🤍 Liking topic:', topicId);
+    
+    // Call the like API
+    const result = await apiClient.toggleTopicLike(topicId);
+    console.log('🤍 Like result:', result);
+    
+    // Update the topic in state immediately for instant feedback
+    setTopics(prevTopics => 
+      prevTopics.map(topic => 
+        topic.id === topicId 
+          ? { 
+              ...topic, 
+              likes: result.like_count,
+              userLiked: result.liked 
+            }
+          : topic
+      )
+    );
+
+    // Force refresh the data after a short delay
+    setTimeout(() => {
+      loadForumData(true); // Pass true to force refresh
+    }, 500);
+
+    toast.success(result.liked ? 'Topic liked!' : 'Like removed');
+    
+  } catch (error) {
+    console.error('Error toggling topic like:', error);
+    toast.error('Failed to update like');
+  }
+};
+
+
 
   const handleCreateTopic = async (formData) => {
     try {
@@ -181,120 +241,136 @@ const Forum = () => {
   };
 
   const TopicCard = ({ topic }) => {
-    const categoryInfo = getCategoryInfo(topic.category);
-    
-    return (
-      <Link 
-        to={`/forum/topic/${topic.id}`}
-        className="block group"
-      >
-        <div className="clay-card p-6 bg-white/70 backdrop-blur-sm hover:bg-white/90 hover:scale-[1.02] transition-all duration-300 border border-transparent hover:border-green-200">
-          <div className="flex gap-4">
-            {/* Author Avatar */}
-            <div className="flex-shrink-0">
-              <div className="w-12 h-12 clay-card rounded-2xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center overflow-hidden">
-                {topic.author.avatar ? (
-                  <img 
-                    src={topic.author.avatar} 
-                    alt={topic.author.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span className="text-white font-semibold">
-                    {topic.author.name.charAt(0).toUpperCase()}
-                  </span>
+  const categoryInfo = getCategoryInfo(topic.category);
+  
+  const handleLikeClick = (e) => {
+    e.preventDefault(); // Prevent navigation to topic
+    e.stopPropagation();
+    handleLikeTopic(topic.id);
+  };
+  
+  return (
+    <Link 
+      to={`/forum/topic/${topic.id}`}
+      className="block group"
+    >
+      <div className="clay-card p-6 bg-white/70 backdrop-blur-sm hover:bg-white/90 hover:scale-[1.02] transition-all duration-300 border border-transparent hover:border-green-200">
+        <div className="flex gap-4">
+          {/* Author Avatar */}
+          <div className="flex-shrink-0">
+            <div className="w-12 h-12 clay-card rounded-2xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center overflow-hidden">
+              {topic.author.avatar ? (
+                <img 
+                  src={topic.author.avatar} 
+                  alt={topic.author.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-white font-semibold">
+                  {topic.author.name.charAt(0).toUpperCase()}
+                </span>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            {/* Header with badges */}
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                {topic.isPinned && (
+                  <div className="flex items-center gap-1 clay-badge clay-badge-orange text-xs px-2 py-1">
+                    <Pin className="w-3 h-3" />
+                    Pinned
+                  </div>
                 )}
+                {topic.isLocked && (
+                  <div className="flex items-center gap-1 clay-badge clay-badge-red text-xs px-2 py-1">
+                    <Lock className="w-3 h-3" />
+                    Locked
+                  </div>
+                )}
+                {topic.isNew && (
+                  <div className="clay-badge clay-badge-green text-xs px-2 py-1">
+                    New
+                  </div>
+                )}
+                {topic.isHot && (
+                  <div className="clay-badge clay-badge-purple text-xs px-2 py-1">
+                    🔥 Hot
+                  </div>
+                )}
+                
+                <div className={`clay-badge text-xs px-2 py-1 bg-gradient-to-r ${categoryInfo.color} text-white`}>
+                  {categoryInfo.name}
+                </div>
               </div>
+              
+              <ArrowRight className="w-4 h-4 clay-text-soft group-hover:text-green-600 transition-colors" />
             </div>
             
-            <div className="flex-1 min-w-0">
-              {/* Header with badges */}
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2 flex-wrap">
-                  {topic.isPinned && (
-                    <div className="flex items-center gap-1 clay-badge clay-badge-orange text-xs px-2 py-1">
-                      <Pin className="w-3 h-3" />
-                      Pinned
-                    </div>
-                  )}
-                  {topic.isLocked && (
-                    <div className="flex items-center gap-1 clay-badge clay-badge-red text-xs px-2 py-1">
-                      <Lock className="w-3 h-3" />
-                      Locked
-                    </div>
-                  )}
-                  {topic.isNew && (
-                    <div className="clay-badge clay-badge-green text-xs px-2 py-1">
-                      New
-                    </div>
-                  )}
-                  {topic.isHot && (
-                    <div className="clay-badge clay-badge-purple text-xs px-2 py-1">
-                      🔥 Hot
-                    </div>
-                  )}
-                  
-                  <div className={`clay-badge text-xs px-2 py-1 bg-gradient-to-r ${categoryInfo.color} text-white`}>
-                    {categoryInfo.name}
-                  </div>
+            {/* Title */}
+            <h3 className="clay-text-title text-lg font-semibold mb-2 line-clamp-2 group-hover:text-green-600 transition-colors leading-tight">
+              {topic.title}
+            </h3>
+            
+            {/* Author Info */}
+            <div className="flex items-center gap-2 mb-3">
+              <span className="font-medium text-sm">{topic.author.name}</span>
+              {topic.author.isModerator && (
+                <div className="clay-badge clay-badge-blue text-xs px-2 py-1">
+                  Mod
+                </div>
+              )}
+              <span className="clay-text-soft text-xs">•</span>
+              <span className="clay-text-soft text-xs">
+                {formatDistanceToNow(topic.createdDate, { addSuffix: true })}
+              </span>
+            </div>
+            
+            {/* Content Preview */}
+            <p className="clay-text-soft text-sm mb-4 line-clamp-2 leading-relaxed">
+              {topic.content}
+            </p>
+            
+            {/* Stats */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1 clay-text-soft">
+                  <MessageCircle className="w-4 h-4" />
+                  <span className="text-sm font-medium">{topic.replies}</span>
+                </div>
+                <div className="flex items-center gap-1 clay-text-soft">
+                  <Eye className="w-4 h-4" />
+                  <span className="text-sm font-medium">{topic.views}</span>
                 </div>
                 
-                <ArrowRight className="w-4 h-4 clay-text-soft group-hover:text-green-600 transition-colors" />
+                {/* FIXED: Clickable Like Button with Real Data */}
+                <button
+                  onClick={handleLikeClick}
+                  className={`flex items-center gap-1 transition-colors ${
+                    topic.userLiked 
+                      ? 'text-red-500 hover:text-red-600' 
+                      : 'clay-text-soft hover:text-red-500'
+                  }`}
+                  title={user ? (topic.userLiked ? 'Unlike' : 'Like') : 'Login to like'}
+                >
+                  <Heart className={`w-4 h-4 ${topic.userLiked ? 'fill-current' : ''}`} />
+                  <span className="text-sm font-medium">{topic.likes}</span>
+                </button>
               </div>
               
-              {/* Title */}
-              <h3 className="clay-text-title text-lg font-semibold mb-2 line-clamp-2 group-hover:text-green-600 transition-colors leading-tight">
-                {topic.title}
-              </h3>
-              
-              {/* Author Info */}
-              <div className="flex items-center gap-2 mb-3">
-                <span className="font-medium text-sm">{topic.author.name}</span>
-                {topic.author.isModerator && (
-                  <div className="clay-badge clay-badge-blue text-xs px-2 py-1">
-                    Mod
-                  </div>
-                )}
-                <span className="clay-text-soft text-xs">•</span>
-                <span className="clay-text-soft text-xs">
-                  {formatDistanceToNow(topic.createdDate, { addSuffix: true })}
-                </span>
-              </div>
-              
-              {/* Content Preview */}
-              <p className="clay-text-soft text-sm mb-4 line-clamp-2 leading-relaxed">
-                {topic.content}
-              </p>
-              
-              {/* Stats */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1 clay-text-soft">
-                    <MessageCircle className="w-4 h-4" />
-                    <span className="text-sm font-medium">{topic.replies}</span>
-                  </div>
-                  <div className="flex items-center gap-1 clay-text-soft">
-                    <Eye className="w-4 h-4" />
-                    <span className="text-sm font-medium">{topic.views}</span>
-                  </div>
-                  <div className="flex items-center gap-1 clay-text-soft">
-                    <Heart className="w-4 h-4" />
-                    <span className="text-sm font-medium">{topic.likes}</span>
-                  </div>
-                </div>
-                
-                <div className="text-right">
-                  <p className="clay-text-soft text-xs">
-                    Last activity {formatDistanceToNow(topic.lastActivity, { addSuffix: true })}
-                  </p>
-                </div>
+              <div className="text-right">
+                <p className="clay-text-soft text-xs">
+                  Last activity {formatDistanceToNow(topic.lastActivity, { addSuffix: true })}
+                </p>
               </div>
             </div>
           </div>
         </div>
-      </Link>
-    );
-  };
+      </div>
+    </Link>
+  );
+};
 
   const CategoryCard = ({ category }) => {
     const IconComponent = category.icon;

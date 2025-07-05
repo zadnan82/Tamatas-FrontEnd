@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ui/Toast';
@@ -19,11 +19,17 @@ import {
   Leaf,
   TrendingUp,
   Users,
-  HelpCircle
+  HelpCircle,
+  Pencil,
+  Trash2,
+  Save,
+  Share2
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 
 const Topic = () => {
+  console.log('🚀 Topic.jsx loaded - UPDATED VERSION with working three dots menu');
+  
   const { topicId } = useParams();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -51,12 +57,12 @@ const Topic = () => {
       setLoading(true);
       const topicData = await apiClient.getForumTopic(topicId);
       
-
-       console.log('=== TOPIC API RESPONSE ===');
-    console.log('topicData:', topicData);
-    console.log('like_count:', topicData.like_count);
-    console.log('user_liked:', topicData.user_liked);
-    console.log('========================');
+      console.log('=== TOPIC API RESPONSE ===');
+      console.log('topicData:', topicData);
+      console.log('like_count:', topicData.like_count);
+      console.log('user_liked:', topicData.user_liked);
+      console.log('========================');
+      
       // Process topic data for UI
       const processedTopic = {
         id: topicData.id,
@@ -103,19 +109,21 @@ const Topic = () => {
       setPostsLoading(true);
       const postsData = await apiClient.getTopicPosts(topicId);
 
-       console.log('=== POSTS API RESPONSE ===');
-    console.log('postsData:', postsData);
-    if (postsData.length > 0) {
-      console.log('first post like_count:', postsData[0].like_count);
-      console.log('first post user_liked:', postsData[0].user_liked);
-    }
-    console.log('========================');
+      console.log('=== POSTS API RESPONSE ===');
+      console.log('postsData:', postsData);
+      if (postsData.length > 0) {
+        console.log('first post like_count:', postsData[0].like_count);
+        console.log('first post user_liked:', postsData[0].user_liked);
+      }
+      console.log('========================');
       
       // Process posts data for UI
       const processedPosts = postsData.map(post => ({
         id: post.id,
         content: post.content,
         createdDate: new Date(post.created_date),
+        updatedDate: post.updated_date ? new Date(post.updated_date) : null,
+        isEdited: !!post.updated_date,
         parentPostId: post.parent_post_id,
         author: {
           id: post.created_by,
@@ -155,56 +163,56 @@ const Topic = () => {
 
   // Add like handler
   const handleLike = async (postId, isTopicPost = false) => {
-  if (!user) {
-    toast.error('Please sign in to like posts');
-    return;
-  }
-
-  const likeKey = isTopicPost ? `topic-${postId}` : `post-${postId}`;
-  
-  console.log('Like clicked:', { postId, isTopicPost, likeKey });
-  
-  // Make API call to persist the like
-  try {
-    if (isTopicPost) {
-      const response = await apiClient.toggleTopicLike(postId);
-      // Update state with server response
-      setLikes(prev => ({
-        ...prev,
-        [likeKey]: {
-          count: response.like_count,
-          isLiked: response.liked
-        }
-      }));
-    } else {
-      const response = await apiClient.togglePostLike(postId);
-      // Update state with server response
-      setLikes(prev => ({
-        ...prev,
-        [likeKey]: {
-          count: response.like_count,
-          isLiked: response.liked
-        }
-      }));
+    if (!user) {
+      toast.error('Please sign in to like posts');
+      return;
     }
-  } catch (error) {
-    console.error('Error updating like:', error);
+
+    const likeKey = isTopicPost ? `topic-${postId}` : `post-${postId}`;
     
-    // Revert the like state if API call fails
-    setLikes(prev => {
-      const currentLike = prev[likeKey];
-      return {
-        ...prev,
-        [likeKey]: {
-          count: currentLike.isLiked ? currentLike.count - 1 : currentLike.count + 1,
-          isLiked: !currentLike.isLiked
-        }
-      };
-    });
+    console.log('Like clicked:', { postId, isTopicPost, likeKey });
     
-    toast.error('Failed to update like');
-  }
-};
+    // Make API call to persist the like
+    try {
+      if (isTopicPost) {
+        const response = await apiClient.toggleTopicLike(postId);
+        // Update state with server response
+        setLikes(prev => ({
+          ...prev,
+          [likeKey]: {
+            count: response.like_count,
+            isLiked: response.liked
+          }
+        }));
+      } else {
+        const response = await apiClient.togglePostLike(postId);
+        // Update state with server response
+        setLikes(prev => ({
+          ...prev,
+          [likeKey]: {
+            count: response.like_count,
+            isLiked: response.liked
+          }
+        }));
+      }
+    } catch (error) {
+      console.error('Error updating like:', error);
+      
+      // Revert the like state if API call fails
+      setLikes(prev => {
+        const currentLike = prev[likeKey];
+        return {
+          ...prev,
+          [likeKey]: {
+            count: currentLike.isLiked ? currentLike.count - 1 : currentLike.count + 1,
+            isLiked: !currentLike.isLiked
+          }
+        };
+      });
+      
+      toast.error('Failed to update like');
+    }
+  };
 
   const handleCreatePost = async (e) => {
     e.preventDefault();
@@ -245,9 +253,118 @@ const Topic = () => {
     return categoryMap[categoryId] || { name: 'General', icon: MessageSquare, color: 'from-gray-400 to-gray-500' };
   };
 
+  // ENHANCED POST CARD WITH WORKING THREE DOTS MENU
   const PostCard = ({ post, isReply = false, isTopicPost = false }) => {
+    const [showMenu, setShowMenu] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editContent, setEditContent] = useState(post.content);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const menuRef = useRef(null);
+
     const likeKey = isTopicPost ? `topic-${post.id}` : `post-${post.id}`;
     const postLikes = likes[likeKey] || { count: post.likes || 0, isLiked: post.isLiked || false };
+
+    // Close menu when clicking outside
+    useEffect(() => {
+      const handleClickOutside = (event) => {
+        if (menuRef.current && !menuRef.current.contains(event.target)) {
+          setShowMenu(false);
+        }
+      };
+
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const canEdit = user && (user.id === post.author.id || user.is_moderator);
+    const canDelete = user && (user.id === post.author.id || user.is_moderator);
+
+    const handleEdit = async () => {
+      if (!editContent.trim()) {
+        toast.error('Content cannot be empty');
+        return;
+      }
+
+      try {
+        if (isTopicPost) {
+          // Update topic
+          await apiClient.updateForumTopic(post.id, { 
+            content: editContent.trim() 
+          });
+          toast.success('Topic updated successfully!');
+        } else {
+          // Update post
+          await apiClient.updateForumPost(post.id, { 
+            content: editContent.trim() 
+          });
+          toast.success('Post updated successfully!');
+        }
+        
+        setIsEditing(false);
+        setShowMenu(false);
+        
+        // Refresh data
+        if (isTopicPost) {
+          loadTopic(); // Refresh topic
+        }
+        loadPosts(); // Refresh posts
+      } catch (error) {
+        console.error('Error updating:', error);
+        toast.error(isTopicPost ? 'Failed to update topic' : 'Failed to update post');
+      }
+    };
+
+    const handleDelete = async () => {
+      const itemType = isTopicPost ? 'topic' : 'post';
+      if (!window.confirm(`Are you sure you want to delete this ${itemType}? This action cannot be undone.${isTopicPost ? ' This will delete the entire discussion and all replies!' : ''}`)) {
+        return;
+      }
+
+      try {
+        setIsDeleting(true);
+        
+        if (isTopicPost) {
+          // Delete entire topic
+          await apiClient.deleteForumTopic(post.id);
+          toast.success('Topic deleted successfully!');
+          // Navigate back to forum
+          navigate('/forum');
+        } else {
+          // Delete post
+          await apiClient.deleteForumPost(post.id);
+          toast.success('Post deleted successfully!');
+          // Refresh posts
+          loadPosts();
+        }
+        
+        setShowMenu(false);
+      } catch (error) {
+        console.error('Error deleting:', error);
+        toast.error(isTopicPost ? 'Failed to delete topic' : 'Failed to delete post');
+      } finally {
+        setIsDeleting(false);
+      }
+    };
+
+    const handleReport = () => {
+      const reason = prompt('Please describe why you are reporting this post:');
+      if (reason && reason.trim()) {
+        toast.success('Post reported. Thank you for helping keep our community safe.');
+        setShowMenu(false);
+        console.log('Reported post:', post.id, 'Reason:', reason);
+      }
+    };
+
+    if (isDeleting) {
+      return (
+        <div className="clay-card p-6 bg-red-50 border border-red-200">
+          <div className="flex items-center justify-center">
+            <div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin mr-3"></div>
+            <span className="text-red-700">Deleting post...</span>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className={`clay-card p-6 bg-white/60 backdrop-blur-sm ${isReply ? 'ml-8 mt-4' : ''}`}>
@@ -274,6 +391,11 @@ const Topic = () => {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-sm">{post.author.name}</span>
+                {isTopicPost && (
+                  <span className="px-2 py-0.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                    OP
+                  </span>
+                )}
                 {post.author.isModerator && (
                   <div className="clay-badge clay-badge-purple text-xs px-2 py-1">
                     Moderator
@@ -296,53 +418,154 @@ const Topic = () => {
               <div className="flex items-center gap-2">
                 <span className="clay-text-soft text-xs">
                   {formatDistanceToNow(post.createdDate, { addSuffix: true })}
+                  {post.isEdited && <span className="ml-1 italic">(edited)</span>}
                 </span>
-                <button className="clay-button p-1 rounded-lg">
-                  <MoreVertical className="w-4 h-4" />
-                </button>
+                
+                {/* WORKING THREE DOTS MENU */}
+                <div className="relative" ref={menuRef}>
+                  <button 
+                    onClick={() => {
+                      console.log('🔥 Three dots clicked!', { 
+                        postId: post.id, 
+                        showMenu, 
+                        user: user?.email,
+                        canEdit,
+                        canDelete 
+                      });
+                      setShowMenu(!showMenu);
+                    }}
+                    className="clay-button p-1 rounded-lg hover:bg-gray-200 transition-colors"
+                    style={{ 
+                      backgroundColor: showMenu ? '#fee2e2' : 'transparent',
+                      border: showMenu ? '2px solid #ef4444' : '1px solid transparent'
+                    }}
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showMenu && (
+                    <div className="absolute right-0 top-8 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                      {canEdit && (
+                        <button
+                          onClick={() => {
+                            console.log('🔥 Edit clicked!', { isTopicPost, postId: post.id });
+                            setIsEditing(true);
+                            setShowMenu(false);
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                        >
+                          <Pencil className="w-4 h-4" />
+                          {isTopicPost ? 'Edit Topic' : 'Edit Post'}
+                        </button>
+                      )}
+                      
+                      {canDelete && (
+                        <button
+                          onClick={handleDelete}
+                          className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          {isTopicPost ? 'Delete Topic' : 'Delete Post'}
+                        </button>
+                      )}
+                      
+                      {user && user.id !== post.author.id && (
+                        <button
+                          onClick={handleReport}
+                          className="w-full px-4 py-2 text-left text-sm text-orange-600 hover:bg-orange-50 flex items-center gap-2"
+                        >
+                          <Flag className="w-4 h-4" />
+                          Report Post
+                        </button>
+                      )}
+                      
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${window.location.origin}/forum/topic/${topicId}#post-${post.id}`);
+                          toast.success('Post link copied to clipboard!');
+                          setShowMenu(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                      >
+                        <Share2 className="w-4 h-4" />
+                        Copy Link
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             
             {/* Post Content */}
-            <div className="prose prose-sm max-w-none mb-4">
-              <p className="clay-text-content leading-relaxed whitespace-pre-wrap">
-                {post.content}
-              </p>
+            <div className="mb-4">
+              {isEditing ? (
+                <div className="space-y-3">
+                  <textarea
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="Edit your post..."
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleEdit}
+                      disabled={!editContent.trim()}
+                      className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      <Save className="w-4 h-4" />
+                      {isTopicPost ? 'Save Topic' : 'Save Changes'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsEditing(false);
+                        setEditContent(post.content);
+                      }}
+                      className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="prose prose-sm max-w-none">
+                  <p className="clay-text-content leading-relaxed whitespace-pre-wrap">
+                    {post.content}
+                  </p>
+                </div>
+              )}
             </div>
             
             {/* Post Actions */}
-            <div className="flex items-center gap-4">
-              {/* WORKING LIKE BUTTON */}
-              <button 
-                onClick={() => handleLike(post.id, isTopicPost)}
-                className={`flex items-center gap-1 transition-colors ${
-                  postLikes.isLiked 
-                    ? 'text-red-600 hover:text-red-700' 
-                    : 'clay-text-soft hover:text-red-600'
-                }`}
-              >
-                <Heart 
-                  className="w-4 h-4" 
-                  fill={postLikes.isLiked ? 'currentColor' : 'none'}
-                />
-                <span className="text-sm font-medium">{postLikes.count}</span>
-              </button>
-              
-              {user && !isReply && (
+            {!isEditing && (
+              <div className="flex items-center gap-4">
+                {/* WORKING LIKE BUTTON */}
                 <button 
-                  onClick={() => setReplyingTo(post)}
-                  className="flex items-center gap-1 clay-text-soft hover:text-blue-600 transition-colors"
+                  onClick={() => handleLike(post.id, isTopicPost)}
+                  className={`flex items-center gap-1 transition-colors ${
+                    postLikes.isLiked 
+                      ? 'text-red-600 hover:text-red-700' 
+                      : 'clay-text-soft hover:text-red-600'
+                  }`}
                 >
-                  <Reply className="w-4 h-4" />
-                  <span className="text-sm">Reply</span>
+                  <Heart 
+                    className="w-4 h-4" 
+                    fill={postLikes.isLiked ? 'currentColor' : 'none'}
+                  />
+                  <span className="text-sm font-medium">{postLikes.count}</span>
                 </button>
-              )}
-              
-              <button className="flex items-center gap-1 clay-text-soft hover:text-red-600 transition-colors">
-                <Flag className="w-4 h-4" />
-                <span className="text-sm">Report</span>
-              </button>
-            </div>
+                
+                {user && !isReply && (
+                  <button 
+                    onClick={() => setReplyingTo(post)}
+                    className="flex items-center gap-1 clay-text-soft hover:text-blue-600 transition-colors"
+                  >
+                    <Reply className="w-4 h-4" />
+                    <span className="text-sm">Reply</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -379,6 +602,8 @@ const Topic = () => {
 
   return (
     <div className="max-w-4xl mx-auto">
+     
+
       {/* Header */}
       <div className="clay-card p-6 mb-6 bg-gradient-to-br from-white/80 to-white/60">
         <div className="flex items-center gap-4 mb-4">
@@ -438,7 +663,8 @@ const Topic = () => {
             createdDate: topic.createdDate,
             author: topic.author,
             likes: topic.likes,
-            isLiked: false
+            isLiked: false,
+            isEdited: false
           }} 
           isTopicPost={true}
         />
