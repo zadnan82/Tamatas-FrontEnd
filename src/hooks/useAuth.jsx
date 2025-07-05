@@ -1,19 +1,12 @@
-// src/hooks/useAuth.jsx - Updated with location support
+// src/hooks/useAuth.jsx - Fixed for Fast Refresh compatibility
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { apiClient } from '../config/api';
 
 const AuthContext = createContext();
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return context;
-};
-
-export const AuthProvider = ({ children }) => {
+// FIXED: Use function declaration instead of arrow function for component
+export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -215,4 +208,13 @@ export const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
-};
+}
+
+// FIXED: Use function declaration for the hook
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
+}

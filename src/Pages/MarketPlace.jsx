@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ui/Toast';
@@ -23,7 +23,11 @@ import {
   X,
   Plus,
   Map,
-  Navigation
+  Navigation,
+  Gift,
+  UserSearch,
+  DollarSign,
+  Target
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
@@ -38,7 +42,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Custom markers for different listing types
+// Enhanced custom markers for three listing types
 const createCustomIcon = (listing) => {
   const getCategoryIcon = (category) => {
     const iconMap = {
@@ -58,326 +62,198 @@ const createCustomIcon = (listing) => {
     return iconMap[category] || '🥒';
   };
 
-  const color = listing.listing_type === 'for_sale' ? '#22c55e' : '#3b82f6';
+  // NEW: Different colors for three listing types
+  const getTypeColor = (type) => {
+    switch(type) {
+      case 'for_sale': return '#22c55e';      // Green
+      case 'looking_for': return '#3b82f6';   // Blue  
+      case 'give_away': return '#f59e0b';     // Orange/Gold
+      default: return '#6b7280';              // Gray
+    }
+  };
+
+  const color = getTypeColor(listing.listing_type);
   const icon = getCategoryIcon(listing.category);
   
   return L.divIcon({
     html: `
       <div style="
         background-color: ${color};
-        width: 30px;
-        height: 30px;
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
-        border: 2px solid white;
+        border: 3px solid white;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 16px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         cursor: pointer;
+        position: relative;
       ">
         ${icon}
+        ${listing.listing_type === 'give_away' ? '<div style="position:absolute;top:-2px;right:-2px;background:#f59e0b;color:white;font-size:8px;padding:1px 3px;border-radius:6px;font-weight:bold;">FREE</div>' : ''}
       </div>
     `,
     className: 'custom-marker',
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
-    popupAnchor: [0, -15],
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -16],
   });
 };
+ 
 
-// Real Leaflet Map Component
-const MapView = ({ listings, onListingHover, onListingClick }) => {
-  // Comprehensive Swedish cities including all Stockholm suburbs
-  const swedishCities = {
-    // Stockholm city and central areas
-    'Stockholm': [59.3293, 18.0686],
-    'Gamla Stan': [59.3251, 18.0721],
-    'Södermalm': [59.3165, 18.0685],
-    'Östermalm': [59.3364, 18.0862],
-    'Norrmalm': [59.3326, 18.0649],
-    'Vasastan': [59.3431, 18.0592],
-    'Kungsholmen': [59.3275, 18.0394],
-    
-    // Stockholm suburbs (your data likely uses these)
-    'Farsta': [59.2441, 18.0974],  // Found in your data!
-    'Huddinge': [59.2362, 17.9826],
-    'Rinkeby': [59.3891, 17.9272],
-    'Tensta': [59.3964, 17.9030],
-    'Spånga': [59.3847, 17.8897],
-    'Handen': [59.1676, 18.1369],
-    'Jordbro': [59.1934, 18.0833],
-    'Flemingsberg': [59.2195, 17.9486],
-    'Skärholmen': [59.2775, 17.9067],
-    'Sätra': [59.2581, 17.9325],
-    'Bredäng': [59.2883, 17.9386],
-    'Fruängen': [59.2994, 17.9697],
-    'Hägersten': [59.3003, 17.9897],
-    'Liljeholmen': [59.3111, 18.0208],
-    'Aspudden': [59.3086, 18.0306],
-    'Telefonplan': [59.2997, 18.0378],
-    'Midsommarkransen': [59.3022, 18.0189],
-    'Älvsjö': [59.2736, 18.0069],
-    'Årsta': [59.2989, 18.0481],
-    'Enskede': [59.2750, 18.0792],
-    'Globen': [59.2931, 18.0831],
-    'Bagarmossen': [59.2686, 18.1167],
-    'Skarpnäck': [59.2511, 18.1331],
-    'Hökarängen': [59.2561, 18.0911],
-    'Rågsved': [59.2472, 18.0694],
-    'Hagsätra': [59.2397, 18.0575],
-    'Fagersjö': [59.2344, 18.0822],
-    'Stureby': [59.2661, 18.0622],
-    'Svedmyra': [59.2622, 18.0772],
-    'Bandhagen': [59.2656, 18.0914],
-    'Björkhagen': [59.2753, 18.1089],
-    'Kärrtorp': [59.2831, 18.1222],
-    'Bagarmossen': [59.2686, 18.1167],
-    'Blåsut': [59.2889, 18.1278],
-    'Hammarbyhöjden': [59.2925, 18.1056],
-    'Johanneshov': [59.2989, 18.0778],
-    'Gröndal': [59.3144, 18.0189],
-    'Reimersholme': [59.3125, 18.0356],
-    'Långholmen': [59.3181, 18.0364],
-    'Södermalm': [59.3165, 18.0685],
-    'Hornstull': [59.3139, 18.0386],
-    'Zinkensdamm': [59.3178, 18.0492],
-    'Mariatorget': [59.3164, 18.0658],
-    'Slussen': [59.3203, 18.0722],
-    'Katarina': [59.3181, 18.0783],
-    'Sofia': [59.3097, 18.0831],
-    'Vitabergsparken': [59.3147, 18.0789],
-    'Ersta': [59.3156, 18.0836],
-    
-    // Northern suburbs
-    'Sollentuna': [59.4281, 17.9507],
-    'Täby': [59.4439, 18.0687],
-    'Danderyd': [59.4065, 18.0438],
-    'Lidingö': [59.3667, 18.1333],
-    'Upplands Väsby': [59.5186, 17.9116],
-    'Järfälla': [59.4103, 17.8313],
-    'Sundbyberg': [59.3606, 17.9708],
-    'Solna': [59.3599, 18.0073],
-    'Sundbyberg': [59.3606, 17.9708],
-    'Akalla': [59.4089, 17.9089],
-    'Hallonbergen': [59.3917, 17.9167],
-    'Rissne': [59.3750, 17.9250],
-    'Duvbo': [59.3833, 17.9000],
-    'Vällingby': [59.3667, 17.8667],
-    'Råcksta': [59.3583, 17.8833],
-    'Blackeberg': [59.3500, 17.8833],
-    'Ängbyplan': [59.3417, 17.8750],
-    'Islandstorget': [59.3333, 17.8667],
-    'Hökarängen': [59.2561, 18.0911],
-    
-    // Eastern suburbs
-    'Nacka': [59.3109, 18.1634],
-    'Värmdö': [59.3500, 18.3667],
-    'Gustavsberg': [59.3333, 18.3833],
-    'Saltsjöbaden': [59.2833, 18.3000],
-    'Fisksätra': [59.2667, 18.2833],
-    'Sickla': [59.3056, 18.1556],
-    'Henriksdal': [59.3056, 18.1222],
-    'Finnboda': [59.3139, 18.1444],
-    'Kvarnholmen': [59.3194, 18.1556],
-    'Östermalm': [59.3364, 18.0862],
-    'Djurgården': [59.3244, 18.1156],
-    'Gärdet': [59.3433, 18.1033],
-    'Ladugårdsgärdet': [59.3500, 18.1000],
-    
-    // Western suburbs
-    'Ekerö': [59.2833, 17.7833],
-    'Bromma': [59.3417, 17.9417],
-    'Vällingby': [59.3667, 17.8667],
-    'Rinkeby': [59.3891, 17.9272],
-    'Tensta': [59.3964, 17.9030],
-    'Hjulsta': [59.4028, 17.8889],
-    'Kista': [59.4039, 17.9472],
-    'Akalla': [59.4089, 17.9089],
-    'Husby': [59.4056, 17.9194],
-    
-    // Southern suburbs
-    'Haninge': [59.1684, 18.1447],
-    'Tyresö': [59.2428, 18.2391],
-    'Salem': [59.2058, 17.7928],
-    'Botkyrka': [59.2000, 17.8333],
-    'Södertälje': [59.1947, 17.6253],
-    'Tumba': [59.1981, 17.8319],
-    'Tullinge': [59.2000, 17.9000],
-    'Flemingsberg': [59.2195, 17.9486],
-    'Vårby': [59.2472, 17.9361],
-    'Kungens Kurva': [59.2667, 17.9167],
-    'Skärholmen': [59.2775, 17.9067],
-    'Vårberg': [59.2583, 17.9167],
-    'Fittja': [59.2500, 17.8833],
-    'Alby': [59.2500, 17.8500],
-    'Norsborg': [59.2417, 17.8250],
-    'Hallunda': [59.2417, 17.8417],
-    
-    // Other major Swedish cities
-    'Göteborg': [57.7089, 11.9746],
-    'Gothenburg': [57.7089, 11.9746],
-    'Malmö': [55.6050, 13.0038],
-    'Uppsala': [59.8586, 17.6389],
-    'Västerås': [59.6162, 16.5528],
-    'Örebro': [59.2741, 15.2066],
-    'Linköping': [58.4108, 15.6214],
-    'Helsingborg': [56.0465, 12.6945],
-    'Jönköping': [57.7826, 14.1618],
-    'Norrköping': [58.5877, 16.1924],
-    'Lund': [55.7047, 13.1910],
-    'Umeå': [63.8258, 20.2630],
-    'Gävle': [60.6749, 17.1413],
-    'Borås': [57.7210, 12.9401],
-    'Eskilstuna': [59.3717, 16.5077]
-  };
+const MapView = ({ listings, onListingHover, onListingClick, userLocation }) => {
+  const mapRef = useRef(null);
+  const [activePopup, setActivePopup] = useState(null);
 
-  // Calculate map center based on actual listings
-  const calculateMapCenter = (listings) => {
-    if (!listings || listings.length === 0) {
-      return [59.3293, 18.0686]; // Stockholm fallback
+  // Custom icon creation
+  const createCustomIcon = useCallback((listing) => {
+    const getCategoryIcon = (category) => {
+      const iconMap = {
+        'tomatoes_peppers': '🍅',
+        'herbs': '🌿',
+        'berries': '🫐',
+        // Add other categories as needed
+        'other': '🥒'
+      };
+      return iconMap[category] || '🥒';
+    };
+
+    const getTypeColor = (type) => {
+      switch(type) {
+        case 'for_sale': return '#22c55e';
+        case 'looking_for': return '#3b82f6';
+        case 'give_away': return '#f59e0b';
+        default: return '#6b7280';
+      }
+    };
+
+    const color = getTypeColor(listing.listing_type);
+    const icon = getCategoryIcon(listing.category);
+    
+    return L.divIcon({
+      html: `
+        <div style="
+          background-color: ${color};
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          border: 3px solid white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+          cursor: pointer;
+          position: relative;
+        ">
+          ${icon}
+          ${listing.listing_type === 'give_away' ? 
+            '<div style="position:absolute;top:-2px;right:-2px;background:#f59e0b;color:white;font-size:8px;padding:1px 3px;border-radius:6px;font-weight:bold;">FREE</div>' : ''}
+        </div>
+      `,
+      className: 'custom-marker',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+      popupAnchor: [0, -16],
+    });
+  }, []);
+
+  // Filter listings with valid coordinates
+  const listingsWithCoords = useMemo(() => {
+    return listings.filter(listing => 
+      listing.location?.latitude && listing.location?.longitude
+    ).map(listing => ({
+      ...listing,
+      lat: parseFloat(listing.location.latitude),
+      lng: parseFloat(listing.location.longitude)
+    }));
+  }, [listings]);
+
+  // Calculate map center
+  const mapCenter = useMemo(() => {
+    if (userLocation?.latitude && userLocation?.longitude) {
+      return [userLocation.latitude, userLocation.longitude];
     }
-
-    // Check for real coordinates first
-    const listingsWithCoords = listings.filter(listing => 
-      (listing.location?.latitude && listing.location?.longitude) ||
-      (listing.coordinates?.lat && listing.coordinates?.lng) ||
-      (listing.latitude && listing.longitude) ||
-      (listing.lat && listing.lng)
-    );
-
+    
     if (listingsWithCoords.length > 0) {
-      const avgLat = listingsWithCoords.reduce((sum, listing) => {
-        const lat = listing.location?.latitude || listing.coordinates?.lat || listing.latitude || listing.lat;
-        return sum + lat;
-      }, 0) / listingsWithCoords.length;
-      
-      const avgLng = listingsWithCoords.reduce((sum, listing) => {
-        const lng = listing.location?.longitude || listing.coordinates?.lng || listing.longitude || listing.lng;
-        return sum + lng;
-      }, 0) / listingsWithCoords.length;
-      
+      const avgLat = listingsWithCoords.reduce((sum, listing) => 
+        sum + listing.lat, 0) / listingsWithCoords.length;
+      const avgLng = listingsWithCoords.reduce((sum, listing) => 
+        sum + listing.lng, 0) / listingsWithCoords.length;
       return [avgLat, avgLng];
     }
-
-    // Look for cities in various possible locations
-    const cities = [];
-    listings.forEach(listing => {
-      const city = listing.location?.city || listing.city || listing.address?.city;
-      if (city) cities.push(city);
-    });
     
-    if (cities.length > 0) {
-      // Find most common city
-      const cityCount = cities.reduce((acc, city) => {
-        acc[city] = (acc[city] || 0) + 1;
-        return acc;
-      }, {});
-      
-      const topCity = Object.keys(cityCount).reduce((a, b) => 
-        cityCount[a] > cityCount[b] ? a : b
-      );
+    return [59.3293, 18.0686]; // Default to Stockholm
+  }, [userLocation, listingsWithCoords]);
 
-      if (swedishCities[topCity]) {
-        return swedishCities[topCity];
-      }
-    }
-
-    // Default to Stockholm area
-    return [59.3293, 18.0686];
-  };
-
-  const mapCenter = calculateMapCenter(listings);
-  
-  // Prepare listings with coordinates - try multiple data structures
-  const listingsWithCoords = listings.map((listing) => {
-    // Try to get coordinates from various possible locations
-    let lat, lng;
-    
-    // Check location.latitude/longitude first (your data structure)
-    if (listing.location?.latitude && listing.location?.longitude) {
-      lat = listing.location.latitude;
-      lng = listing.location.longitude;
-    }
-    // Check other possible coordinate structures
-    else if (listing.coordinates?.lat && listing.coordinates?.lng) {
-      lat = listing.coordinates.lat;
-      lng = listing.coordinates.lng;
-    } else if (listing.latitude && listing.longitude) {
-      lat = listing.latitude;
-      lng = listing.longitude;
-    } else if (listing.lat && listing.lng) {
-      lat = listing.lat;
-      lng = listing.lng;
+  // Calculate zoom level
+  const zoomLevel = useMemo(() => {
+    if (userLocation?.search_radius) {
+      const radius = userLocation.search_radius;
+      if (radius <= 10) return 12;
+      if (radius <= 25) return 10;
+      if (radius <= 50) return 9;
+      return 8;
     }
     
-    // If we have real coordinates, use them
-    if (lat && lng && lat !== null && lng !== null) {
-      return {
-        ...listing,
-        lat: lat,
-        lng: lng
-      };
-    }
+    if (listingsWithCoords.length <= 1) return 12;
     
-    // Get city from location.city (your data structure)
-    const city = listing.location?.city || listing.city || listing.address?.city;
-    
-    if (city && swedishCities[city]) {
-      const cityCoords = swedishCities[city];
-      // Use stable offset based on listing ID
-      const latOffset = ((listing.id ? listing.id.charCodeAt(0) : 0) % 7 - 3) * 0.002;
-      const lngOffset = ((listing.id ? listing.id.charCodeAt(1) : 0) % 5 - 2) * 0.002;
-      
-      return {
-        ...listing,
-        lat: cityCoords[0] + latOffset,
-        lng: cityCoords[1] + lngOffset
-      };
-    }
-    
-    // If no valid location found, don't include on map
-    return null;
-  }).filter(Boolean);
-
-  // Calculate appropriate zoom level
-  const calculateZoom = (listings) => {
-    if (listings.length <= 1) return 13;
-    
-    const lats = listings.map(l => l.lat);
-    const lngs = listings.map(l => l.lng);
+    const lats = listingsWithCoords.map(l => l.lat);
+    const lngs = listingsWithCoords.map(l => l.lng);
     const latRange = Math.max(...lats) - Math.min(...lats);
     const lngRange = Math.max(...lngs) - Math.min(...lngs);
     const maxRange = Math.max(latRange, lngRange);
     
-    if (maxRange > 5) return 6;
     if (maxRange > 2) return 8;
     if (maxRange > 0.5) return 10;
     if (maxRange > 0.1) return 12;
     return 14;
-  };
+  }, [userLocation, listingsWithCoords]);
 
-  const zoomLevel = calculateZoom(listingsWithCoords);
+  // Handle marker hover
+  const handleMarkerHover = useCallback((listing, e) => {
+    if (mapRef.current) {
+      // Temporarily disable map movement during hover
+      mapRef.current.dragging.disable();
+      mapRef.current.scrollWheelZoom.disable();
+      
+      // Open popup and set active listing
+      e.target.openPopup();
+      setActivePopup(listing.id);
+      onListingHover?.(listing);
+    }
+  }, [onListingHover]);
 
-  // Show debug info if no valid listings
+  // Handle marker leave
+  const handleMarkerLeave = useCallback((e) => {
+    if (mapRef.current) {
+      // Re-enable map movement
+      mapRef.current.dragging.enable();
+      mapRef.current.scrollWheelZoom.enable();
+      
+      // Close popup and clear active listing
+      e.target.closePopup();
+      setActivePopup(null);
+      onListingHover?.(null);
+    }
+  }, [onListingHover]);
+
+  // Handle marker click
+  const handleMarkerClick = useCallback((listing) => {
+    onListingClick?.(listing);
+  }, [onListingClick]);
+
   if (listingsWithCoords.length === 0) {
-    const sampleCities = Object.keys(swedishCities).slice(0, 10).join(', ');
     return (
       <div className="relative w-full h-96 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
         <div className="text-center p-6 max-w-md">
           <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-3" />
           <h3 className="text-lg font-semibold text-gray-600 mb-2">No locations to display</h3>
           <p className="text-sm text-gray-500 mb-4">
-            Found {listings.length} listings but none have valid location data.
+            Found {listings.length} listings but none have valid location coordinates.
           </p>
-          <div className="text-xs text-gray-400 text-left bg-gray-50 p-3 rounded">
-            <strong>Looking for:</strong><br/>
-            • Coordinates: location.latitude/longitude<br/>
-            • Cities: location.city<br/>
-            <br/>
-            <strong>Supported cities include:</strong><br/>
-            {sampleCities}... and {Object.keys(swedishCities).length - 10} more
-          </div>
         </div>
       </div>
     );
@@ -389,6 +265,7 @@ const MapView = ({ listings, onListingHover, onListingClick }) => {
         center={mapCenter}
         zoom={zoomLevel}
         style={{ height: '100%', width: '100%' }}
+        ref={mapRef}
         className="z-0"
       >
         <TileLayer
@@ -396,81 +273,83 @@ const MapView = ({ listings, onListingHover, onListingClick }) => {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
         
+        {/* User location marker */}
+        {userLocation?.latitude && userLocation?.longitude && (
+          <Marker
+            position={[userLocation.latitude, userLocation.longitude]}
+            icon={L.divIcon({
+              html: `
+                <div style="
+                  background:#3b82f6;
+                  width:20px;
+                  height:20px;
+                  border-radius:50%;
+                  border:3px solid white;
+                  box-shadow:0 2px 4px rgba(0,0,0,0.3);
+                ">
+                  <div style="
+                    width:8px;
+                    height:8px;
+                    background:white;
+                    border-radius:50%;
+                    margin:3px;
+                  "></div>
+                </div>
+              `,
+              className: 'user-location-marker',
+              iconSize: [20, 20],
+              iconAnchor: [10, 10],
+            })}
+          >
+            <Popup>
+              <div className="text-center p-2">
+                <p className="font-semibold text-blue-600">Your Location</p>
+                <p className="text-xs text-gray-500">
+                  {userLocation.location?.city && userLocation.location?.country 
+                    ? `${userLocation.location.city}, ${userLocation.location.country}`
+                    : 'Current location'
+                  }
+                </p>
+              </div>
+            </Popup>
+          </Marker>
+        )}
+        
+        {/* Listing markers */}
         {listingsWithCoords.map((listing) => (
           <Marker
             key={listing.id}
             position={[listing.lat, listing.lng]}
             icon={createCustomIcon(listing)}
             eventHandlers={{
-              mouseover: () => onListingHover?.(listing),
-              mouseout: () => onListingHover?.(null),
-              click: () => onListingClick?.(listing),
+              mouseover: (e) => handleMarkerHover(listing, e),
+              mouseout: handleMarkerLeave,
+              click: () => handleMarkerClick(listing)
             }}
           >
-            <Popup>
-              <div className="w-64 p-2">
-                <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0">
-                    {listing.images && listing.images[0] ? (
-                      <img 
-                        src={listing.images[0]} 
-                        alt={listing.title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center">
-                        <Leaf className="w-6 h-6 text-white" />
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm text-gray-900 line-clamp-2 mb-1">
-                      {listing.title}
-                    </h3>
-                    <p className="text-xs text-gray-500 line-clamp-2 mb-2">
-                      {listing.description}
-                    </p>
-                    
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        listing.listing_type === 'for_sale' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {listing.listing_type === 'for_sale' ? 'For Sale' : 'Looking For'}
-                      </span>
-                      
-                      {listing.price && (
-                        <div className="text-right">
-                          <p className="font-bold text-sm text-green-600">${listing.price}</p>
-                          <p className="text-xs text-gray-500">{listing.price_unit?.replace('per_', '')}</p>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {listing.organic && (
-                      <div className="flex items-center gap-1 mb-2">
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
-                          <Leaf className="w-2 h-2" />
-                          Organic
-                        </span>
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
-                      <MapPin className="w-3 h-3" />
-                      <span className="truncate">
-                        {listing.location?.city || listing.city || 'Location not specified'}
-                      </span>
-                    </div>
-                    
-                    <button 
-                      onClick={() => onListingClick?.(listing)}
-                      className="w-full py-1 bg-gradient-to-r from-orange-400 to-red-400 text-white font-semibold text-xs rounded-lg"
-                    >
-                      View Details
-                    </button>
-                  </div>
+            <Popup className="custom-popup">
+              <div className="w-72 p-3">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold text-sm text-gray-900 line-clamp-1 flex-1">
+                    {listing.title}
+                  </h3>
+                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ml-2 ${
+                    listing.listing_type === 'for_sale' 
+                      ? 'bg-green-500 text-white' 
+                      : listing.listing_type === 'looking_for'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-orange-500 text-white'
+                  }`}>
+                    {listing.listing_type === 'for_sale' && <ShoppingBag className="w-2 h-2" />}
+                    {listing.listing_type === 'looking_for' && <UserSearch className="w-2 h-2" />}
+                    {listing.listing_type === 'give_away' && <Gift className="w-2 h-2" />}
+                    {listing.listing_type === 'for_sale' && 'For Sale'}
+                    {listing.listing_type === 'looking_for' && 'Looking For'}
+                    {listing.listing_type === 'give_away' && 'FREE'}
+                  </span>
                 </div>
+
+                {/* Rest of your popup content */}
               </div>
             </Popup>
           </Marker>
@@ -489,37 +368,203 @@ const MapView = ({ listings, onListingHover, onListingClick }) => {
             <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
             <span className="text-xs text-gray-600">Looking For</span>
           </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-orange-500 rounded-full"></div>
+            <span className="text-xs text-gray-600">Give Away (FREE)</span>
+          </div>
+          {userLocation?.latitude && (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-blue-600 rounded-full border-2 border-white"></div>
+              <span className="text-xs text-gray-600">Your Location</span>
+            </div>
+          )}
         </div>
       </div>
       
-      {/* Dynamic Map Info */}
-      <div className="absolute top-4 left-4 bg-green-100 border border-green-300 rounded-lg p-2 text-xs text-green-800 max-w-xs z-10">
-        <strong>Stockholm Map:</strong> Showing {listingsWithCoords.length} of {listings.length} listings in Farsta & area
-      </div>
+      {/* Search radius indicator */}
+      {userLocation?.search_radius && (
+        <div className="absolute top-4 left-4 bg-blue-100 border border-blue-300 rounded-lg p-2 text-xs text-blue-800 max-w-xs z-10">
+          <strong>Search Radius:</strong> {userLocation.search_radius} miles
+        </div>
+      )}
     </div>
   );
 };
+ 
 
 const Marketplace = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [listings, setListings] = useState([]);
   const [filteredListings, setFilteredListings] = useState([]);
+  const [userLocation, setUserLocation] = useState(null);
   const [filters, setFilters] = useState({
     category: 'all',
     search: '',
     listing_type: 'all',
     location: '',
     organic_only: false,
+    near_me: false,
+    radius: 25,
     price_range: 'all',
-    sort_by: 'created_date'
+    sort_by: 'created_date',
+    sort_order: 'desc'
   });
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('grid'); // 'grid', 'list', 'map'
   const [showFilters, setShowFilters] = useState(false);
   const [favorites, setFavorites] = useState([]);
+  // NEW: Location autocomplete state
+  const [locationSuggestions, setLocationSuggestions] = useState([]);
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const [searchLocation, setSearchLocation] = useState('');
   const [hoveredListing, setHoveredListing] = useState(null);
+const [searchLoading, setSearchLoading] = useState(false);
+const [searchTerm, setSearchTerm] = useState('');
+const [isTyping, setIsTyping] = useState(false);
+ const [searchInput, setSearchInput] = useState('');
+const searchTimeoutRef = useRef(null);
+const [locationInput, setLocationInput] = useState('');
+const locationTimeoutRef = useRef(null);
+const [isSearching, setIsSearching] = useState(false);
 
+
+// Add this effect to handle clicks when popup is open
+useEffect(() => {
+  if (hoveredListing) {
+    const timer = setTimeout(() => {
+      setHoveredListing(null);
+    }, 3000); // Auto-close after 3 seconds
+    return () => clearTimeout(timer);
+  }
+}, [hoveredListing]);
+
+// Handle item search input
+const handleSearchChange = (value) => {
+  setSearchInput(value);
+  
+  // Clear previous timeout
+  clearTimeout(searchTimeoutRef.current);
+  
+  // Set new timeout (350ms delay)
+  searchTimeoutRef.current = setTimeout(() => {
+    setFilters(prev => ({
+      ...prev,
+      search: value
+    }));
+    setIsSearching(false);
+  }, 350);
+  
+  setIsSearching(true);
+};
+
+// Handle location search input
+const handleLocationChange = (value) => {
+  setLocationInput(value);
+  
+  // Clear previous timeout
+  clearTimeout(locationTimeoutRef.current);
+  
+  // Set new timeout (400ms delay)
+  locationTimeoutRef.current = setTimeout(() => {
+    if (value.length >= 2) {
+      loadLocationSuggestions(value);
+    }
+    setFilters(prev => ({
+      ...prev,
+      location: value
+    }));
+  }, 400);
+};
+
+// Handle location suggestion selection
+const handleLocationSelect = (suggestion) => {
+  const locationStr = `${suggestion.city}, ${suggestion.country}`;
+  setLocationInput(locationStr);
+  setFilters(prev => ({
+    ...prev,
+    location: locationStr,
+    near_me: false // Disable "near me" when selecting a specific location
+  }));
+  setShowLocationSuggestions(false);
+  loadListings();
+};
+
+
+
+
+
+
+  // NEW: Load location suggestions
+  const loadLocationSuggestions = async (query) => {
+    if (!query || query.length < 2) {
+      setLocationSuggestions([]);
+      setShowLocationSuggestions(false);
+      return;
+    }
+
+    try {
+      const suggestions = await apiClient.searchLocations(query);
+      setLocationSuggestions(suggestions);
+      setShowLocationSuggestions(true);
+    } catch (error) {
+      console.error('Error loading location suggestions:', error);
+      setLocationSuggestions([]);
+    }
+  };
+
+  
+// Debounced search effect
+useEffect(() => {
+  const handler = setTimeout(() => {
+    if (isTyping) {
+      setFilters(prev => ({...prev, search: searchTerm}));
+      setIsTyping(false);
+    }
+  }, 300); // Adjust timing as needed (300ms is good balance)
+
+  return () => clearTimeout(handler);
+}, [searchTerm, isTyping]);
+
+// Only trigger API call when filters.search changes
+useEffect(() => {
+  if (filters.search !== undefined) {
+    loadListings();
+  }
+}, [filters.search]);
+
+  const handleLocationSearchChange = useCallback((value) => {
+    // Update location immediately for UI
+    setSearchLocation(value);
+    setFilters(prev => ({...prev, location: value}));
+  }, []);
+
+  // Separate debounced effects for API calls
+  useEffect(() => {
+  const timer = setTimeout(() => {
+    if (filters.search.length >= 2 || filters.search.length === 0) {
+      setSearchLoading(true);
+      loadListings().finally(() => setSearchLoading(false));
+    }
+  }, 300); // Reduced from 500ms to 300ms
+
+  return () => clearTimeout(timer);
+}, [filters.search]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchLocation.length >= 2) {
+        loadLocationSuggestions(searchLocation);
+      } else if (searchLocation.length === 0) {
+        setLocationSuggestions([]);
+        setShowLocationSuggestions(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchLocation]); // Only watch location changes
+
+  // NEW: Updated categories to match backend
   const categories = [
     { value: 'all', label: 'All Categories' },
     { value: 'tomatoes_peppers', label: 'Tomatoes & Peppers' },
@@ -537,31 +582,93 @@ const Marketplace = () => {
   ];
 
   useEffect(() => {
+    loadUserLocation();
     loadListings();
     if (user) {
       loadFavorites();
     }
   }, [user]);
 
+  // Only trigger API calls when specific filters change
   useEffect(() => {
-    filterListings();
-  }, [listings, filters]);
+    loadListings();
+  }, [
+    filters.category,
+    filters.listing_type, 
+    filters.organic_only,
+    filters.near_me,
+    filters.radius,
+    filters.sort_by,
+    filters.sort_order
+  ]);
 
+  // Separate effect for filtering (client-side only)
+  useEffect(() => {
+    if (listings.length > 0) {
+      filterListings();
+    }
+  }, [listings]);
+
+  useEffect(() => {
+  return () => {
+    clearTimeout(searchTimeoutRef.current);
+    clearTimeout(locationTimeoutRef.current);
+  };
+}, []);
+  // NEW: Load user location from backend
+  const loadUserLocation = async () => {
+    if (!user) return;
+    
+    try {
+      const locationData = await apiClient.getUserLocation();
+      setUserLocation(locationData);
+      
+      // Update radius filter if user has custom radius
+      if (locationData.search_radius) {
+        setFilters(prev => ({ ...prev, radius: locationData.search_radius }));
+      }
+    } catch (error) {
+      console.error('Error loading user location:', error);
+    }
+  };
+
+  // NEW: Enhanced listing loading with better state management
   const loadListings = async () => {
     try {
       setLoading(true);
       
-      // Load real listings from database
-      const data = await apiClient.getListings({
+      // Use current filters state to build query
+      const currentFilters = {
         skip: 0,
         limit: 100,
-        ...filters
-      });
+        category: filters.category !== 'all' ? filters.category : undefined,
+        listing_type: filters.listing_type !== 'all' ? filters.listing_type : undefined,
+        search: filters.search || undefined,
+        location: filters.location || undefined,
+        organic_only: filters.organic_only || undefined,
+        near_me: filters.near_me || undefined,
+        radius: filters.radius || undefined,
+        sort_by: filters.sort_by,
+        sort_order: filters.sort_order
+      };
+
+      // Remove undefined values
+      Object.keys(currentFilters).forEach(key => 
+        currentFilters[key] === undefined && delete currentFilters[key]
+      );
       
-      setListings(data || []);
+      const data = await apiClient.getListings(currentFilters);
+      
+      // Only update if we actually got data
+      if (data !== null && data !== undefined) {
+        setListings(data || []);
+      }
     } catch (error) {
       console.error('Error loading listings:', error);
-      toast.error('Failed to load listings');
+      // Don't show error toast on every search - only on initial load
+      if (listings.length === 0) {
+        toast.error('Failed to load listings');
+      }
     } finally {
       setLoading(false);
     }
@@ -577,6 +684,8 @@ const Marketplace = () => {
   };
 
   const filterListings = () => {
+    // Basic filtering is now handled by the backend,
+    // but we can still do client-side filtering for immediate response
     let filtered = [...listings];
 
     if (filters.search) {
@@ -586,57 +695,16 @@ const Marketplace = () => {
       );
     }
 
-    if (filters.category !== 'all') {
-      filtered = filtered.filter(listing => listing.category === filters.category);
-    }
-
-    if (filters.listing_type !== 'all') {
-      filtered = filtered.filter(listing => listing.listing_type === filters.listing_type);
-    }
-
     if (filters.location) {
       filtered = filtered.filter(listing =>
         listing.location?.city?.toLowerCase().includes(filters.location.toLowerCase()) ||
-        listing.location?.state?.toLowerCase().includes(filters.location.toLowerCase())
+        listing.location?.state?.toLowerCase().includes(filters.location.toLowerCase()) ||
+        listing.location?.country?.toLowerCase().includes(filters.location.toLowerCase())
       );
-    }
-
-    if (filters.organic_only) {
-      filtered = filtered.filter(listing => listing.organic);
-    }
-
-    if (filters.price_range !== 'all' && filters.price_range) {
-      filtered = filtered.filter(listing => {
-        if (!listing.price) return filters.price_range === 'free';
-        const price = listing.price;
-        switch (filters.price_range) {
-          case '0-5': return price <= 5;
-          case '5-10': return price > 5 && price <= 10;
-          case '10-20': return price > 10 && price <= 20;
-          case '20+': return price > 20;
-          default: return true;
-        }
-      });
-    }
-
-    // Apply sorting
-    switch (filters.sort_by) {
-      case 'price':
-        filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
-        break;
-      case 'view_count':
-        filtered.sort((a, b) => (b.view_count || 0) - (a.view_count || 0));
-        break;
-      case 'created_date':
-      default:
-        filtered.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
-        break;
     }
 
     setFilteredListings(filtered);
   };
-
-  
 
   const toggleFavorite = async (listingId) => {
     if (!user) {
@@ -647,9 +715,11 @@ const Marketplace = () => {
     try {
       const isFavorited = favorites.includes(listingId);
       if (isFavorited) {
+        await apiClient.removeFavorite(listingId);
         setFavorites(prev => prev.filter(id => id !== listingId));
         toast.success('Removed from favorites');
       } else {
+        await apiClient.addFavorite(listingId);
         setFavorites(prev => [...prev, listingId]);
         toast.success('Added to favorites');
       }
@@ -659,10 +729,32 @@ const Marketplace = () => {
     }
   };
 
-  const handleFilterChange = (newFilters) => {
+  // NEW: Handle "Near Me" toggle
+  const handleNearMeToggle = (enabled) => {
+    if (enabled && (!userLocation?.latitude || !userLocation?.longitude)) {
+      toast.error('Please set your location in your profile to use "Near Me" search');
+      return;
+    }
+    
+    const newFilters = { ...filters, near_me: enabled };
     setFilters(newFilters);
-    // Reload listings with new filters
-    loadListings();
+    
+    // Reload with new filters
+    setTimeout(() => loadListings(), 100);
+  };
+
+  const handleFilterChange = (newFilters) => {
+    // Use functional update to prevent stale closures
+    setFilters(prevFilters => {
+      const updatedFilters = { ...prevFilters, ...newFilters };
+      
+      // Delay the API call to next tick to ensure state is updated
+      setTimeout(() => {
+        loadListings();
+      }, 50);
+      
+      return updatedFilters;
+    });
   };
 
   const clearFilters = () => {
@@ -672,19 +764,58 @@ const Marketplace = () => {
       listing_type: 'all',
       location: '',
       organic_only: false,
+      near_me: false,
+      radius: userLocation?.search_radius || 25,
       price_range: 'all',
-      sort_by: 'created_date'
+      sort_by: 'created_date',
+      sort_order: 'desc'
     };
     setFilters(defaultFilters);
+    setSearchLocation(''); // Clear location search
+    setShowLocationSuggestions(false);
+    setTimeout(() => loadListings(), 100);
   };
 
   const handleMapListingClick = (listing) => {
-    // Navigate to listing detail - you can implement this with your routing
     window.location.href = `/listing/${listing.id}`;
   };
 
+  // NEW: Enhanced ListingCard with three listing types
   const ListingCard = ({ listing, compact = false, highlighted = false }) => {
     const isFavorited = favorites.includes(listing.id);
+    
+    // NEW: Get listing type styling
+    const getListingTypeInfo = (type) => {
+      switch(type) {
+        case 'for_sale':
+          return {
+            color: 'bg-green-500 text-white',
+            icon: ShoppingBag,
+            label: 'For Sale'
+          };
+        case 'looking_for':
+          return {
+            color: 'bg-blue-500 text-white',
+            icon: UserSearch,
+            label: 'Looking For'
+          };
+        case 'give_away':
+          return {
+            color: 'bg-orange-500 text-white',
+            icon: Gift,
+            label: 'FREE'
+          };
+        default:
+          return {
+            color: 'bg-gray-500 text-white',
+            icon: Target,
+            label: 'Unknown'
+          };
+      }
+    };
+
+    const typeInfo = getListingTypeInfo(listing.listing_type);
+    const TypeIcon = typeInfo.icon;
     
     if (compact) {
       return (
@@ -717,21 +848,29 @@ const Marketplace = () => {
                   </Link>
                   <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{listing.description}</p>
                 </div>
-                {listing.price && (
+                
+                {/* NEW: Price display logic for three types */}
+                {listing.listing_type === 'for_sale' && listing.price && (
                   <div className="text-right ml-2">
                     <p className="font-bold text-sm sm:text-base text-green-600">${listing.price}</p>
                     <p className="text-xs text-gray-500">{listing.price_unit?.replace('per_', '')}</p>
+                  </div>
+                )}
+                {listing.listing_type === 'give_away' && (
+                  <div className="text-right ml-2">
+                    <p className="font-bold text-sm sm:text-base text-orange-600">FREE</p>
                   </div>
                 )}
               </div>
               
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1 sm:gap-2">
-                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${
-                    listing.listing_type === 'for_sale' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                  }`}>
-                    {listing.listing_type === 'for_sale' ? 'For Sale' : 'Looking For'}
+                  {/* NEW: Enhanced type badge */}
+                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${typeInfo.color}`}>
+                    <TypeIcon className="w-2 h-2" />
+                    {typeInfo.label}
                   </span>
+                  
                   {listing.organic && (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
                       <Leaf className="w-2 h-2" />
@@ -741,6 +880,13 @@ const Marketplace = () => {
                 </div>
                 
                 <div className="flex items-center gap-1">
+                  {/* NEW: Distance display */}
+                  {listing.distance && (
+                    <span className="text-xs text-gray-500 mr-1">
+                      {listing.distance} miles
+                    </span>
+                  )}
+                  
                   <button
                     onClick={() => toggleFavorite(listing.id)}
                     className={`p-1 rounded-lg ${isFavorited ? 'text-red-500' : 'text-gray-400'}`}
@@ -781,23 +927,11 @@ const Marketplace = () => {
               </div>
             )}
             
+            {/* NEW: Enhanced type badge */}
             <div className="absolute top-2 left-2">
-              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium shadow-md ${
-                listing.listing_type === 'for_sale' 
-                  ? 'bg-green-500 text-white' 
-                  : 'bg-blue-500 text-white'
-              }`}>
-                {listing.listing_type === 'for_sale' ? (
-                  <>
-                    <ShoppingBag className="w-2 h-2" />
-                    For Sale
-                  </>
-                ) : (
-                  <>
-                    <Search className="w-2 h-2" />
-                    Looking For
-                  </>
-                )}
+              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium shadow-md ${typeInfo.color}`}>
+                <TypeIcon className="w-2 h-2" />
+                {typeInfo.label}
               </span>
             </div>
             
@@ -826,6 +960,13 @@ const Marketplace = () => {
                 <Eye className="w-2 h-2" />
                 <span>{listing.view_count || 0}</span>
               </div>
+              {/* NEW: Distance indicator */}
+              {listing.distance && (
+                <div className="flex items-center gap-1 text-white text-xs bg-black/50 backdrop-blur-sm px-2 py-1 rounded-lg">
+                  <MapPin className="w-2 h-2" />
+                  <span>{listing.distance}mi</span>
+                </div>
+              )}
             </div>
           </div>
           
@@ -837,10 +978,18 @@ const Marketplace = () => {
                 </h3>
                 <p className="text-xs text-gray-500 mt-1">{listing.category?.replace('_', ' ')}</p>
               </div>
-              {listing.price && (
+              
+              {/* NEW: Enhanced price display */}
+              {listing.listing_type === 'for_sale' && listing.price && (
                 <div className="text-right ml-2">
                   <p className="font-bold text-base sm:text-lg text-green-600">${listing.price}</p>
                   <p className="text-xs text-gray-500">{listing.price_unit?.replace('per_', '')}</p>
+                </div>
+              )}
+              {listing.listing_type === 'give_away' && (
+                <div className="text-right ml-2">
+                  <p className="font-bold text-base sm:text-lg text-orange-600">FREE</p>
+                  <p className="text-xs text-gray-500">Give Away</p>
                 </div>
               )}
             </div>
@@ -871,8 +1020,8 @@ const Marketplace = () => {
                 <div className="flex items-center gap-1">
                   <MapPin className="w-3 h-3" />
                   <span className="truncate">
-                    {listing.location?.city && listing.location?.state 
-                      ? `${listing.location.city}, ${listing.location.state}`
+                    {listing.location?.city && listing.location?.country 
+                      ? `${listing.location.city}, ${listing.location.country}`
                       : 'Location not specified'
                     }
                   </span>
@@ -883,9 +1032,18 @@ const Marketplace = () => {
                 </div>
               </div>
               
-              <button className="w-full py-2 bg-gradient-to-r from-orange-400 to-red-400 text-white font-semibold flex items-center justify-center gap-2 text-xs rounded-lg">
+              {/* NEW: Dynamic button based on listing type */}
+              <button className={`w-full py-2 font-semibold flex items-center justify-center gap-2 text-xs rounded-lg ${
+                listing.listing_type === 'for_sale' 
+                  ? 'bg-gradient-to-r from-green-400 to-emerald-400 text-white'
+                  : listing.listing_type === 'looking_for'
+                  ? 'bg-gradient-to-r from-blue-400 to-cyan-400 text-white'
+                  : 'bg-gradient-to-r from-orange-400 to-amber-400 text-white'
+              }`}>
                 <MessageSquare className="w-3 h-3" />
-                Contact Seller
+                {listing.listing_type === 'for_sale' && 'Contact Seller'}
+                {listing.listing_type === 'looking_for' && 'Offer Help'}
+                {listing.listing_type === 'give_away' && 'Claim Free Item'}
               </button>
             </div>
           </div>
@@ -894,6 +1052,7 @@ const Marketplace = () => {
     );
   };
 
+  // NEW: Enhanced FilterPanel with location features
   const FilterPanel = () => (
     <div className={`clay-card p-3 sm:p-4 bg-white/60 ${showFilters ? 'block' : 'hidden lg:block'}`}>
       <div className="flex items-center justify-between mb-3">
@@ -915,6 +1074,47 @@ const Marketplace = () => {
       </div>
       
       <div className="space-y-3">
+        {/* NEW: Near Me Toggle */}
+        {userLocation?.latitude && userLocation?.longitude && (
+          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={filters.near_me}
+                onChange={(e) => handleNearMeToggle(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600"
+              />
+              <Navigation className="w-4 h-4 text-blue-600" />
+              <div className="flex-1">
+                <span className="text-sm font-medium text-gray-700">Near Me</span>
+                <p className="text-xs text-gray-500">
+                  Show listings within {filters.radius} miles of your location
+                </p>
+              </div>
+            </label>
+            
+            {filters.near_me && (
+              <div className="mt-2">
+                <label className="block text-xs font-medium mb-1 text-gray-700">
+                  Search Radius: {filters.radius} miles
+                </label>
+                <input
+                  type="range"
+                  min="5"
+                  max="100"
+                  value={filters.radius}
+                  onChange={(e) => setFilters({...filters, radius: parseInt(e.target.value)})}
+                  className="w-full h-2 bg-gray-200 rounded-lg"
+                />
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>5mi</span>
+                  <span>100mi</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        
         <div>
           <label className="block text-xs font-medium mb-1 text-gray-700">Category</label>
           <select
@@ -928,16 +1128,18 @@ const Marketplace = () => {
           </select>
         </div>
         
+        {/* NEW: Enhanced listing type filter */}
         <div>
-          <label className="block text-xs font-medium mb-1 text-gray-700">Type</label>
+          <label className="block text-xs font-medium mb-1 text-gray-700">Listing Type</label>
           <select
             value={filters.listing_type}
             onChange={(e) => handleFilterChange({...filters, listing_type: e.target.value})}
             className="w-full text-xs p-2 border border-gray-200 rounded-lg bg-white"
           >
             <option value="all">All Types</option>
-            <option value="for_sale">For Sale</option>
-            <option value="looking_for">Looking For</option>
+            <option value="for_sale">🛒 For Sale</option>
+            <option value="looking_for">🔍 Looking For</option>
+            <option value="give_away">🎁 Give Away (FREE)</option>
           </select>
         </div>
         
@@ -949,6 +1151,7 @@ const Marketplace = () => {
             className="w-full text-xs p-2 border border-gray-200 rounded-lg bg-white"
           >
             <option value="all">Any Price</option>
+            <option value="free">FREE (Give Away)</option>
             <option value="0-5">$0 - $5</option>
             <option value="5-10">$5 - $10</option>
             <option value="10-20">$10 - $20</option>
@@ -962,7 +1165,7 @@ const Marketplace = () => {
             <MapPin className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-3 h-3" />
             <input
               type="text"
-              placeholder="City or State"
+              placeholder="City, State, or Country"
               value={filters.location}
               onChange={(e) => setFilters({...filters, location: e.target.value})}
               className="w-full text-xs p-2 pl-7 border border-gray-200 rounded-lg bg-white"
@@ -981,6 +1184,21 @@ const Marketplace = () => {
             <Leaf className="w-3 h-3 text-green-500" />
             <span className="text-xs font-medium text-gray-700">Organic Only</span>
           </label>
+        </div>
+        
+        {/* NEW: Sort by distance option */}
+        <div>
+          <label className="block text-xs font-medium mb-1 text-gray-700">Sort By</label>
+          <select
+            value={filters.sort_by}
+            onChange={(e) => handleFilterChange({...filters, sort_by: e.target.value})}
+            className="w-full text-xs p-2 border border-gray-200 rounded-lg bg-white"
+          >
+            <option value="created_date">Most Recent</option>
+            <option value="view_count">Most Popular</option>
+            <option value="price">Price: Low to High</option>
+            {filters.near_me && <option value="distance">Nearest First</option>}
+          </select>
         </div>
       </div>
     </div>
@@ -1004,7 +1222,10 @@ const Marketplace = () => {
         <div className="flex items-center justify-between mb-3">
           <div>
             <h1 className="text-lg sm:text-xl font-bold mb-1 text-gray-900">Fresh Marketplace</h1>
-            <p className="text-xs sm:text-sm text-gray-600">Discover fresh produce from local farmers and gardeners</p>
+            <p className="text-xs sm:text-sm text-gray-600">
+              Discover fresh produce from local farmers and gardeners
+              {userLocation?.location?.city && ` • ${userLocation.location.city}, ${userLocation.location.country}`}
+            </p>
           </div>
           <div className="hidden md:flex items-center gap-2">
             <button
@@ -1028,78 +1249,111 @@ const Marketplace = () => {
           </div>
         </div>
         
-        {/* Search Bar */}
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search for fresh produce, herbs, vegetables..."
-              value={filters.search}
-              onChange={(e) => setFilters({...filters, search: e.target.value})}
-              className="w-full text-sm p-2.5 pl-10 border border-gray-200 rounded-lg bg-white"
-            />
-          </div>
-          
+        {/* Item Search Input */}
+<div className="flex-1 relative">
+  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 z-10" />
+  <input
+    type="text"
+    placeholder="Search for fresh produce, herbs, vegetables..."
+    value={searchInput}
+    onChange={(e) => handleSearchChange(e.target.value)}
+    className="w-full text-sm p-2.5 pl-10 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
+  />
+  {isSearching && (
+    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+      <div className="w-4 h-4 border-2 border-orange-200 border-t-orange-500 rounded-full animate-spin"></div>
+    </div>
+  )}
+</div>
+
+{/* Location Search Input */}
+<div className="relative w-full sm:w-64">
+  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 z-10" />
+  <input
+    type="text"
+    placeholder="Search area: Stockholm, Malmö..."
+    value={locationInput}
+    onChange={(e) => handleLocationChange(e.target.value)}
+    onFocus={() => setShowLocationSuggestions(true)}
+    onBlur={() => setTimeout(() => setShowLocationSuggestions(false), 200)}
+    className="w-full text-sm p-2.5 pl-10 pr-8 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+  />
+  {locationInput && (
+    <button
+      onClick={() => {
+        setLocationInput('');
+        setFilters(prev => ({...prev, location: ''}));
+        setShowLocationSuggestions(false);
+      }}
+      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+    >
+      <X className="w-4 h-4" />
+    </button>
+  )}
+  
+  {/* Location Suggestions Dropdown */}
+  {showLocationSuggestions && locationSuggestions.length > 0 && (
+    <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 mt-1 max-h-60 overflow-y-auto">
+      {locationSuggestions.map((suggestion, index) => (
+        <button
+          key={index}
+          onClick={() => handleLocationSelect(suggestion)}
+          className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 focus:bg-blue-50 focus:outline-none"
+        >
           <div className="flex items-center gap-2">
-            <select
-              value={filters.sort_by}
-              onChange={(e) => handleFilterChange({...filters, sort_by: e.target.value})}
-              className="text-xs p-2 border border-gray-200 rounded-lg bg-white"
-            >
-              <option value="created_date">Most Recent</option>
-              <option value="view_count">Most Popular</option>
-              <option value="price">Price: Low to High</option>
-            </select>
-            
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="px-3 py-2 border border-gray-200 rounded-lg bg-white flex items-center gap-1 lg:hidden text-xs"
-            >
-              <SlidersHorizontal className="w-3 h-3" />
-              Filters
-            </button>
-            
-            {/* Mobile View Mode Selector */}
-            <div className="flex md:hidden items-center gap-1">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 border border-gray-200 rounded-lg ${viewMode === 'grid' ? 'bg-orange-100 text-orange-600' : 'bg-white hover:bg-gray-50'}`}
-              >
-                <Grid className="w-3 h-3" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 border border-gray-200 rounded-lg ${viewMode === 'list' ? 'bg-orange-100 text-orange-600' : 'bg-white hover:bg-gray-50'}`}
-              >
-                <List className="w-3 h-3" />
-              </button>
-              <button
-                onClick={() => setViewMode('map')}
-                className={`p-2 border border-gray-200 rounded-lg ${viewMode === 'map' ? 'bg-orange-100 text-orange-600' : 'bg-white hover:bg-gray-50'}`}
-              >
-                <Map className="w-3 h-3" />
-              </button>
+            <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">
+                {suggestion.city}
+                {suggestion.state && `, ${suggestion.state}`}
+              </p>
+              <p className="text-xs text-gray-500 truncate">
+                {suggestion.country}
+              </p>
             </div>
           </div>
-        </div>
+        </button>
+      ))}
+    </div>
+  )}
+</div>
+
+
       </div>
 
-      {/* Results Info */}
+      {/* Enhanced Results Info */}
       <div className="clay-card p-2 sm:p-3 mb-4 bg-white/60">
         <div className="flex items-center justify-between">
-          <p className="text-xs text-gray-600">
-            {filteredListings.length} listings found
-            {filters.search && ` for "${filters.search}"`}
-            {viewMode === 'map' && ' - hover over map markers to see details'}
-          </p>
+          <div className="flex-1">
+            <p className="text-xs text-gray-600">
+              {filteredListings.length} listings found
+              {filters.search && ` for "${filters.search}"`}
+              {searchLocation && ` in ${searchLocation}`}
+              {filters.near_me && userLocation?.search_radius && ` within ${userLocation.search_radius} miles of your location`}
+            </p>
+            {viewMode === 'map' && (
+              <p className="text-xs text-gray-500 mt-1">
+                💡 Click on map markers to see detailed information about each listing
+              </p>
+            )}
+          </div>
           
           <div className="flex items-center gap-2">
             {Object.values(filters).some(value => 
-              value !== 'all' && value !== '' && value !== false && value !== 'created_date'
+              value !== 'all' && value !== '' && value !== false && value !== 'created_date' && value !== 'desc' && value !== 25
             ) && (
               <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
                 Filters Active
+              </span>
+            )}
+            {filters.near_me && (
+              <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full font-medium">
+                📍 Near Me
+              </span>
+            )}
+            {searchLocation && (
+              <span className="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded-full font-medium">
+                📍 {searchLocation}
               </span>
             )}
           </div>
@@ -1113,7 +1367,7 @@ const Marketplace = () => {
           <div className="lg:col-span-1">
             <FilterPanel />
             
-            {/* Quick Stats */}
+            {/* NEW: Enhanced Quick Stats */}
             <div className="clay-card p-3 mt-4 bg-gradient-to-br from-green-50 to-emerald-50 hidden lg:block">
               <h3 className="text-sm font-semibold mb-2 text-gray-900">Marketplace Stats</h3>
               <div className="space-y-1">
@@ -1122,16 +1376,20 @@ const Marketplace = () => {
                   <span className="font-semibold text-xs">{listings.length}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-xs text-gray-600">For Sale</span>
-                  <span className="font-semibold text-xs">{listings.filter(l => l.listing_type === 'for_sale').length}</span>
+                  <span className="text-xs text-gray-600">🛒 For Sale</span>
+                  <span className="font-semibold text-xs text-green-600">{listings.filter(l => l.listing_type === 'for_sale').length}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-xs text-gray-600">Looking For</span>
-                  <span className="font-semibold text-xs">{listings.filter(l => l.listing_type === 'looking_for').length}</span>
+                  <span className="text-xs text-gray-600">🔍 Looking For</span>
+                  <span className="font-semibold text-xs text-blue-600">{listings.filter(l => l.listing_type === 'looking_for').length}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-xs text-gray-600">Organic</span>
-                  <span className="font-semibold text-xs text-green-600">{listings.filter(l => l.organic).length}</span>
+                  <span className="text-xs text-gray-600">🎁 Give Away</span>
+                  <span className="font-semibold text-xs text-orange-600">{listings.filter(l => l.listing_type === 'give_away').length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-600">🌱 Organic</span>
+                  <span className="font-semibold text-xs text-emerald-600">{listings.filter(l => l.organic).length}</span>
                 </div>
               </div>
             </div>
@@ -1143,6 +1401,7 @@ const Marketplace = () => {
             <div className="clay-card p-4 bg-white/60">
               <MapView 
                 listings={filteredListings}
+                userLocation={userLocation}
                 onListingHover={setHoveredListing}
                 onListingClick={handleMapListingClick}
               />
@@ -1191,7 +1450,7 @@ const Marketplace = () => {
           <div className="lg:col-span-1">
             <FilterPanel />
             
-            {/* Quick Stats */}
+            {/* NEW: Enhanced Quick Stats */}
             <div className="clay-card p-3 mt-4 bg-gradient-to-br from-green-50 to-emerald-50 hidden lg:block">
               <h3 className="text-sm font-semibold mb-2 text-gray-900">Marketplace Stats</h3>
               <div className="space-y-1">
@@ -1200,16 +1459,20 @@ const Marketplace = () => {
                   <span className="font-semibold text-xs">{listings.length}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-xs text-gray-600">For Sale</span>
-                  <span className="font-semibold text-xs">{listings.filter(l => l.listing_type === 'for_sale').length}</span>
+                  <span className="text-xs text-gray-600">🛒 For Sale</span>
+                  <span className="font-semibold text-xs text-green-600">{listings.filter(l => l.listing_type === 'for_sale').length}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-xs text-gray-600">Looking For</span>
-                  <span className="font-semibold text-xs">{listings.filter(l => l.listing_type === 'looking_for').length}</span>
+                  <span className="text-xs text-gray-600">🔍 Looking For</span>
+                  <span className="font-semibold text-xs text-blue-600">{listings.filter(l => l.listing_type === 'looking_for').length}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-xs text-gray-600">Organic</span>
-                  <span className="font-semibold text-xs text-green-600">{listings.filter(l => l.organic).length}</span>
+                  <span className="text-xs text-gray-600">🎁 Give Away</span>
+                  <span className="font-semibold text-xs text-orange-600">{listings.filter(l => l.listing_type === 'give_away').length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-600">🌱 Organic</span>
+                  <span className="font-semibold text-xs text-emerald-600">{listings.filter(l => l.organic).length}</span>
                 </div>
               </div>
             </div>
@@ -1244,13 +1507,13 @@ const Marketplace = () => {
                 </div>
                 <h3 className="text-base font-semibold mb-2 text-gray-900">No listings found</h3>
                 <p className="text-gray-600 mb-4 text-sm">
-                  {filters.search || filters.category !== 'all' || filters.listing_type !== 'all'
+                  {filters.search || filters.category !== 'all' || filters.listing_type !== 'all' || filters.near_me
                     ? "Try adjusting your search or filters to find what you're looking for."
                     : "Be the first to create a listing in this marketplace!"
                   }
                 </p>
                 <div className="flex flex-wrap gap-2 justify-center">
-                  {(filters.search || filters.category !== 'all' || filters.listing_type !== 'all') && (
+                  {(filters.search || filters.category !== 'all' || filters.listing_type !== 'all' || filters.near_me) && (
                     <button 
                       onClick={clearFilters}
                       className="px-4 py-2 border border-gray-200 rounded-lg bg-white text-sm font-semibold text-gray-700 hover:bg-gray-50"

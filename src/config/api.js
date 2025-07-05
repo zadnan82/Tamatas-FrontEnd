@@ -1,7 +1,7 @@
 // src/config/api.js - Enhanced version with better auth handling
 const API_CONFIG = {
   BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:8001',
-  
+    
   AUTH: {
     LOGIN: '/auth/login',
     REGISTER: '/auth/register',
@@ -50,6 +50,17 @@ const API_CONFIG = {
   CONTACT: {
     BASE: '/contact',
   },
+  LOCATION: {
+    SEARCH_LOCATIONS: '/location/search-locations',
+    USER_LOCATION: '/location/user-location', 
+    UPDATE_USER_LOCATION: '/location/update-user-location',
+    NEARBY_LISTINGS: '/location/nearby-listings',
+    LISTINGS_FOR_MAP: '/location/listings-for-map',
+    SEARCH_BY_LOCATION: '/location/search/location',
+    CONTACT_INFO: (listingId) => `/location/contact-info/${listingId}`,
+    STATS: '/location/stats',
+  },
+  
 };
 
 class ApiClient {
@@ -409,15 +420,23 @@ async register(userData) {
 
   async getListings(filters = {}) {
     const params = new URLSearchParams();
+    
+    // Handle all filter parameters including new location ones
     Object.entries(filters).forEach(([key, value]) => {
-      if (value && value !== 'all' && value !== '') {
-        params.append(key, value);
+      if (value !== undefined && value !== null && value !== 'all' && value !== '') {
+        // Special handling for boolean values
+        if (typeof value === 'boolean') {
+          params.append(key, value.toString());
+        } else {
+          params.append(key, value.toString());
+        }
       }
     });
     
     const query = params.toString();
-    const endpoint = query ? `${API_CONFIG.LISTINGS.BASE}?${query}` : API_CONFIG.LISTINGS.BASE;
-    return this.request(endpoint);
+    const endpoint = query ? `/listings?${query}` : '/listings';
+    
+    return await this.request(endpoint);
   }
 
   async getMyListings() {
@@ -538,21 +557,50 @@ return await this.request('/messages', {
   }
 
   // Favorites methods
-  async getFavorites() {
-    return this.request(API_CONFIG.FAVORITES.BASE);
+   async getFavorites() {
+    try {
+      return await this.request(API_CONFIG.FAVORITES.BASE);
+    } catch (error) {
+      console.error('Failed to get favorites:', error);
+      if (error.status === 401) {
+        throw new Error('Please log in to view favorites');
+      }
+      return []; // Return empty array instead of throwing
+    }
   }
 
-  async addToFavorites(listingId) {
-    return this.request(API_CONFIG.FAVORITES.BASE, {
+   async addFavorite(listingId) {
+    if (!listingId) {
+      throw new Error('Listing ID is required');
+    }
+
+    return await this.request('/favorites', {
       method: 'POST',
       body: JSON.stringify({ listing_id: listingId }),
     });
   }
 
-  async removeFromFavorites(favoriteId) {
-    return this.request(API_CONFIG.FAVORITES.DELETE(favoriteId), {
-      method: 'DELETE',
-    });
+  async removeFavorite(listingId) {
+    if (!listingId) {
+      throw new Error('Listing ID is required');
+    }
+
+    try {
+      // First get all favorites to find the favorite ID
+      const favorites = await this.getFavorites();
+      const favorite = favorites.find(fav => fav.listing_id === listingId);
+      
+      if (!favorite) {
+        throw new Error('Favorite not found');
+      }
+
+      return await this.request(`/favorites/${favorite.id}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      console.error('Failed to remove favorite:', error);
+      throw error;
+    }
   }
 
   // Forum methods
@@ -618,6 +666,104 @@ return await this.request('/messages', {
       method: 'POST',
       body: JSON.stringify(contactData),
     });
+  }
+
+    async searchLocations(query, limit = 5) {
+    if (!query || query.length < 2) {
+      return [];
+    }
+
+    try {
+      const params = new URLSearchParams({
+        q: query,
+        limit: limit.toString()
+      });
+      
+      return await this.request(`/location/search-locations?${params}`);
+    } catch (error) {
+      console.error('Failed to search locations:', error);
+      return []; // Return empty array instead of throwing
+    }
+  }
+
+  // Get user's current location info
+  async getUserLocation() {
+    try {
+      return await this.request('/location/user-location');
+    } catch (error) {
+      console.error('Failed to get user location:', error);
+      if (error.status === 401) {
+        throw new Error('Please log in to access location features');
+      }
+      // Return null instead of throwing for missing location
+      return null;
+    }
+  }
+
+  // Update user's location
+  async updateUserLocation(locationData) {
+    if (!locationData.address) {
+      throw new Error('Address is required');
+    }
+
+    return await this.request('/location/update-user-location', {
+      method: 'PUT',
+      body: JSON.stringify(locationData),
+    });
+  }
+
+  // Get nearby listings with distance information
+  async getNearbyListings(params = {}) {
+    const queryParams = new URLSearchParams();
+    
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== 'all' && value !== '') {
+        queryParams.append(key, value.toString());
+      }
+    });
+
+    return await this.request(`/location/nearby-listings?${queryParams}`);
+  }
+
+  // Get listings for map display
+  async getListingsForMap(bounds, filters = {}) {
+    if (!bounds) {
+      throw new Error('Map bounds are required');
+    }
+
+    const params = new URLSearchParams({
+      bounds: bounds, // Format: "sw_lat,sw_lng,ne_lat,ne_lng"
+    });
+
+    // Add filters
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== 'all' && value !== '') {
+        params.append(key, value.toString());
+      }
+    });
+
+    return await this.request(`/location/listings-for-map?${params}`);
+  }
+
+  // Get contact information for a listing
+  async getListingContactInfo(listingId) {
+    if (!listingId) {
+      throw new Error('Listing ID is required');
+    }
+
+    return await this.request(`/location/contact-info/${listingId}`);
+  }
+
+  // Get location-based statistics
+  async getLocationStats() {
+    try {
+      return await this.request('/location/stats');
+    } catch (error) {
+      console.error('Failed to get location stats:', error);
+      return {
+        message: 'Set your location to see local statistics'
+      };
+    }
   }
 }
 
